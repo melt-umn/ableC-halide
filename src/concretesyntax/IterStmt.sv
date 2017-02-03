@@ -31,8 +31,12 @@ concrete productions top::IterVars_c
     local bt :: BaseTypeExpr =
       figureOutTypeFromSpecifiers(ds.location, ds.typeQualifiers, ds.preTypeSpecifiers, ds.realTypeSpecifiers, ds.mutateTypeSpecifiers);
     top.ast = consIterVar(bt, d.ast, d.declaredIdent, cutoff.ast, rest.ast); }
+(consAnonIterVar_c) | cutoff::AssignExpr_c ',' rest::IterVars_c
+  { top.ast = consAnonIterVar(cutoff.ast, rest.ast); }
 | ds::DeclarationSpecifiers_c d::Declarator_c ':' cutoff::AssignExpr_c
   { forwards to consIterVar_c(ds, d, $3, cutoff, ',', nilIterVar_c()); }
+| cutoff::AssignExpr_c
+  { forwards to consAnonIterVar_c(cutoff, ',', nilIterVar_c()); }
 (nilIterVar_c) | 
   { top.ast = nilIterVar(); }
   

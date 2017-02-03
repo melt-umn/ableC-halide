@@ -74,7 +74,7 @@ top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr b
   top.errors := bty.errors ++ d.errors ++ cutoff.errors ++ body.errors;
   
   production d::Declarator = declarator(n, mty, [], nothingInitializer());
-  d.env = top.env;
+  d.env = openScope(top.env);
   d.baseType = bty.typerep;
   d.isTopLevel = false;
   d.isTypedef = false;
@@ -84,33 +84,34 @@ top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr b
   top.defs = valueDef(n.name, declaratorValueItem(d)) :: body.defs;
   top.iterDefs = valueDef(n.name, declaratorValueItem(d)) :: body.iterDefs;
   top.hostTrans =
-    seqStmt(
-      declStmt( 
-        variableDecls(
-          [],[],
-          bty,
-          consDeclarator(d, nilDeclarator()))),
-      forStmt(
-        justExpr(
-          binaryOpExpr(
-            declRefExpr(n, location=builtin),
-            assignOp(eqOp(location=builtin), location=builtin),
-            mkIntExpr("0", builtin),
-            location=builtin)),
-        justExpr(
-          binaryOpExpr(
-            declRefExpr(n, location=builtin),
-            compareOp(ltOp(location=builtin), location=builtin),
-            cutoff,
-            location=builtin)),
-        justExpr(
-          unaryOpExpr(
-            postIncOp(location=builtin),
-            declRefExpr(n, location=builtin),
-            location=builtin)),
-        body.hostTrans));
+    compoundStmt(
+      seqStmt(
+        declStmt( 
+          variableDecls(
+            [],[],
+            bty,
+            consDeclarator(d, nilDeclarator()))),
+        forStmt(
+          justExpr(
+            binaryOpExpr(
+              declRefExpr(n, location=builtin),
+              assignOp(eqOp(location=builtin), location=builtin),
+              mkIntExpr("0", builtin),
+              location=builtin)),
+          justExpr(
+            binaryOpExpr(
+              declRefExpr(n, location=builtin),
+              compareOp(ltOp(location=builtin), location=builtin),
+              cutoff,
+              location=builtin)),
+          justExpr(
+            unaryOpExpr(
+              postIncOp(location=builtin),
+              declRefExpr(n, location=builtin),
+              location=builtin)),
+          body.hostTrans)));
   
-  body.env = addEnv(d.defs, top.env);
+  body.env = addEnv(d.defs, openScope(top.env));
 }
 
 abstract production multiForIterStmt

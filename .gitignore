@@ -1,0 +1,7 @@
+*~
+*.c
+*.i
+*.out
+*.jar
+*.copperdump.html
+build.xml

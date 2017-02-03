@@ -5,7 +5,7 @@ terminal Into_t 'into' lexer classes {Ckeyword};
 
 closed nonterminal Transformations_c with ast<Transformation>;
 
-concrete productions top::Transformation_c
+concrete productions top::Transformations_c
 | h::Transformation_c t::Transformations_c
   { top.ast = seqTransformation(h.ast, t.ast); }
 | 
@@ -14,5 +14,5 @@ concrete productions top::Transformation_c
 closed nonterminal Transformation_c with ast<Transformation>;
 
 concrete productions top::Transformation_c
-| 'split' id::Identifier_t 'into' '(' iv::IterVar_c ivs::IterVars_c ')' ';'
+| 'split' id::Identifier_t 'into' '(' iv::IterVar_c ',' ivs::IterVars_c ')' ';'
   { top.ast = splitTransformation(fromId(id), iv.ast, ivs.ast); }

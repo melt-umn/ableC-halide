@@ -17,11 +17,15 @@ top::Stmt ::= is::IterStmt t::Transformation
     if !null(is.errors ++ t.errors)
     then is.errors ++ t.errors
     else forward.errors;
-    
-  t.env = addEnv(is.defs, emptyEnv()); -- Env for transformation consists of only the transformable loop variables
   
   t.iterStmtIn = is;
-  forwards to t.iterStmtOut.hostTrans;
+  t.iterEnvIn = addEnv(is.defs, emptyEnv()); -- Env for transformation consists of only the transformable loop variables
+  
+  local transResult::IterStmt = t.iterStmtOut;
+  transResult.env = top.env;
+  transResult.returnType = top.returnType;
+  
+  forwards to transResult.hostTrans;
 }
 
 synthesized attribute hostTrans::Stmt;
@@ -66,8 +70,10 @@ top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr b
   d.baseType = bty.typerep;
   d.isTopLevel = false;
   d.isTypedef = false;
+  d.givenAttributes = [];
+  d.returnType = top.returnType;
   
-  top.defs = [valueDef(n.name, declaratorValueItem(d))];
+  top.defs = valueDef(n.name, declaratorValueItem(d)) :: body.defs;
   top.hostTrans =
     seqStmt(
       declStmt( 
@@ -127,7 +133,7 @@ nonterminal IterVars with pp, errors, iterVarNames, forIterStmtTrans, forIterStm
 abstract production consIterVar
 top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr rest::IterVars
 {
-  --top.pp =
+  top.pp = concat([bty.pp, mty.lpp, n.pp, mty.rpp, text(":"), cutoff.pp, comma(), rest.pp]);
   top.errors := bty.errors ++ mty.errors ++ cutoff.errors ++ rest.errors;
   top.iterVarNames = n :: rest.iterVarNames;
   
@@ -147,7 +153,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
 abstract production consAnonIterVar
 top::IterVars ::= cutoff::Expr rest::IterVars
 {
-  --top.pp =
+  top.pp = concat([cutoff.pp, comma(), rest.pp]);
   forwards to
     consIterVar(
       directTypeExpr(cutoff.typerep),
@@ -174,7 +180,7 @@ nonterminal IterVar with pp, errors, iterVarName, forIterStmtTrans, forIterStmtC
 abstract production iterVar
 top::IterVar ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name
 {
-  --top.pp =
+  top.pp = concat([bty.pp, mty.lpp, n.pp, mty.rpp]);
   top.errors := bty.errors ++ mty.errors;
   top.iterVarName = n;
   top.forIterStmtTrans = forIterStmt(bty, n, mty, top.forIterStmtCutoff, top.forIterStmtBody);

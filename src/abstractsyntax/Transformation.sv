@@ -5,7 +5,7 @@ synthesized attribute iterStmtOut::IterStmt;
 inherited attribute iterEnvIn::Decorated Env;
 synthesized attribute iterEnvOut::Decorated Env;
 
-nonterminal Transformation with pp, errors, iterStmtIn, iterStmtOut, iterEnvIn, iterEnvOut, env;
+nonterminal Transformation with pp, errors, iterStmtIn, iterStmtOut, iterEnvIn, iterEnvOut, env, returnType;
 
 abstract production nullTransformation
 top::Transformation ::= 
@@ -13,6 +13,7 @@ top::Transformation ::=
   top.pp = notext();
   top.errors := [];
   top.iterStmtOut = top.iterStmtIn;
+  top.iterEnvOut = top.iterEnvIn;
 }
 
 abstract production seqTransformation
@@ -24,6 +25,7 @@ top::Transformation ::= h::Transformation t::Transformation
   h.iterStmtIn = top.iterStmtIn;
   t.iterStmtIn = h.iterStmtOut;
   top.iterStmtOut = t.iterStmtOut;
+  h.iterEnvIn = top.iterEnvIn;
   t.iterEnvIn = h.iterEnvOut;
   top.iterEnvOut = t.iterEnvOut;
 }
@@ -31,16 +33,20 @@ top::Transformation ::= h::Transformation t::Transformation
 abstract production splitTransformation
 top::Transformation ::= n::Name iv::IterVar ivs::IterVars
 {
-  --top.pp =
-  top.errors := n.valueLookupCheck; -- ++ iterStmt.errors;
+  top.pp = pp"split ${n.pp} into (${iv.pp}, ${ivs.pp})";
+  top.errors :=
+    (if !null(n.valueLookupCheck)
+     then [err(n.location, "Undeclared loop " ++ n.name)]
+     else []) ++ iv.errors ++ ivs.errors; -- ++ iterStmt.errors;
   
   n.env = top.iterEnvIn;
  
   local iterStmt::IterStmt = top.iterStmtIn;
-  iterStmt.env = top.env;
   iterStmt.target = n.name;
   iterStmt.newIterVar = iv;
   iterStmt.newIterVars = ivs;
+  iterStmt.env = top.env;
+  iterStmt.returnType = top.returnType;
   
   top.iterStmtOut = iterStmt.splitTrans;
   top.iterEnvOut = addEnv(iterStmt.defs, emptyEnv());
@@ -112,14 +118,23 @@ top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr b
           location=builtin),
         body,
         nullIterStmt()));
+  iterVars.env = top.env;
+  iterVars.returnType = top.returnType;
   
   local iterVar::IterVar = top.newIterVar;
-  iterVar.forIterStmtCutoff =
-    binaryOpExpr(
-      cutoff,
-      numOp(divOp(location=builtin), location=builtin),
-      iterVars.outerCutoffTrans,
-      location=builtin);
+  iterVar.forIterStmtCutoff = -- Calculate ceil(cutoff/product of split indices
+    mkAdd(
+      mkIntConst(1, builtin),
+      binaryOpExpr(
+        binaryOpExpr(
+          cutoff,
+          numOp(subOp(location=builtin), location=builtin),
+          mkIntConst(1, builtin),
+          location=builtin),
+        numOp(divOp(location=builtin), location=builtin),
+        iterVars.outerCutoffTrans,
+        location=builtin),
+      builtin);
   iterVar.forIterStmtBody = iterVars.forIterStmtTrans;
 
   top.splitTrans = 
@@ -172,6 +187,5 @@ aspect production nilIterVar
 top::IterVars ::= 
 {
   top.splitIndexTrans = top.splitIndexTransIn;
-  top.outerCutoffTrans =
-    realConstant(integerConstant("1", true, noIntSuffix(), location=builtin), location=builtin);
+  top.outerCutoffTrans = mkIntConst(1, builtin);
 }

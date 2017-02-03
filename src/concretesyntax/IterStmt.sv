@@ -25,13 +25,13 @@ concrete productions top::IterStmt_c
 nonterminal IterVars_c with ast<IterVars>;
 
 concrete productions top::IterVars_c
-(consIterVar_c) | ds::DeclarationSpecifiers_c d::Declarator_c ':' cutoff::Expr_c ',' rest::IterVars_c
+(consIterVar_c) | ds::DeclarationSpecifiers_c d::Declarator_c ':' cutoff::AssignExpr_c ',' rest::IterVars_c
   { ds.givenQualifiers = ds.typeQualifiers;
     d.givenType = baseTypeExpr();
     local bt :: BaseTypeExpr =
       figureOutTypeFromSpecifiers(ds.location, ds.typeQualifiers, ds.preTypeSpecifiers, ds.realTypeSpecifiers, ds.mutateTypeSpecifiers);
     top.ast = consIterVar(bt, d.ast, d.declaredIdent, cutoff.ast, rest.ast); }
-| ds::DeclarationSpecifiers_c d::Declarator_c ':' cutoff::Expr_c
+| ds::DeclarationSpecifiers_c d::Declarator_c ':' cutoff::AssignExpr_c
   { forwards to consIterVar_c(ds, d, $3, cutoff, ',', nilIterVar_c()); }
 (nilIterVar_c) | 
   { top.ast = nilIterVar(); }

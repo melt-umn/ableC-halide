@@ -19,7 +19,7 @@ top::Transformation ::=
 abstract production seqTransformation
 top::Transformation ::= h::Transformation t::Transformation
 {
-  top.pp = concat([ h.pp, line(), t.pp ]);
+  top.pp = concat([h.pp, line(), t.pp]);
   top.errors := h.errors ++ t.errors;
   
   h.iterStmtIn = top.iterStmtIn;
@@ -35,11 +35,16 @@ top::Transformation ::= n::Name iv::IterVar ivs::IterVars
 {
   top.pp = pp"split ${n.pp} into (${iv.pp}, ${ivs.pp})";
   top.errors :=
+     if !null(localErrors)
+     then localErrors
+     else iterStmt.errors;
+  
+  local localErrors::[Message] =
     (if !null(n.valueLookupCheck)
      then [err(n.location, "Undeclared loop " ++ n.name)]
-     else []) ++ iv.errors ++ ivs.errors; -- ++ iterStmt.errors;
+     else []) ++ iv.errors ++ ivs.errors;
   
-  n.env = top.iterEnvIn;
+  n.env = top.iterEnvOut;
  
   local iterStmt::IterStmt = top.iterStmtIn;
   iterStmt.target = n.name;
@@ -49,7 +54,7 @@ top::Transformation ::= n::Name iv::IterVar ivs::IterVars
   iterStmt.returnType = top.returnType;
   
   top.iterStmtOut = iterStmt.splitTrans;
-  top.iterEnvOut = addEnv(iterStmt.defs, emptyEnv());
+  top.iterEnvOut = addEnv(iterStmt.iterDefs, emptyEnv());
 }
 
 abstract production anonSplitTransformation

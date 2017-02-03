@@ -46,22 +46,6 @@ top::IterStmt ::= h::IterStmt t::IterStmt
   top.hostTrans = seqStmt(h.hostTrans, t.hostTrans);
 }
 
-abstract production compoundIterStmt
-top::IterStmt ::= s::IterStmt
-{
-  top.pp = braces(nestlines(2, s.pp));
-  forwards to s; -- No special env
-}
-
-abstract production exprIterStmt
-top::IterStmt ::= e::Expr
-{
-  top.pp = cat(e.pp, semi());
-  top.errors := e.errors;
-  top.defs = [];
-  top.hostTrans = exprStmt(e);
-}
-
 abstract production stmtIterStmt
 top::IterStmt ::= s::Stmt
 {
@@ -114,18 +98,6 @@ top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr b
   body.env = addEnv(d.defs, top.env);
 }
 
-abstract production constForIterStmt
-top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Integer unsigned::Boolean suffix::IntSuffix body::IterStmt
-{
-  forwards to
-    forIterStmt(
-      bty, n, mty,
-      realConstant(
-        integerConstant(toString(cutoff), unsigned, suffix, location=builtin),
-        location=builtin),
-      body);
-}
-
 abstract production multiForIterStmt
 top::IterStmt ::= ivs::IterVars body::IterStmt
 {
@@ -135,21 +107,32 @@ top::IterStmt ::= ivs::IterVars body::IterStmt
   forwards to ivs.forIterStmtTrans;
 }
 
+abstract production condIterStmt
+top::IterStmt ::= cond::Expr th::IterStmt el::IterStmt
+{
+  top.pp = pp"if (${cond.pp}) ${th.pp} else ${el.pp}";
+  top.errors := cond.errors ++ th.errors ++ el.errors;
+  
+  top.defs = th.defs ++ el.defs;
+  top.hostTrans = ifStmt(cond, th.hostTrans, el.hostTrans);
+}
+
 synthesized attribute iterVarNames::[Name];
 
 synthesized attribute forIterStmtTrans::IterStmt;
 inherited attribute forIterStmtBody::IterStmt;
 
-nonterminal IterVars with pp, iterVarNames, forIterStmtTrans, forIterStmtBody;
+nonterminal IterVars with pp, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, env, returnType;
 
 abstract production consIterVar
-top::IterVars ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr t::IterVars
+top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr rest::IterVars
 {
   --top.pp =
-  top.iterVarNames = n :: t.iterVarNames;
+  top.errors := bty.errors ++ mty.errors ++ cutoff.errors ++ rest.errors;
+  top.iterVarNames = n :: rest.iterVarNames;
   
-  top.forIterStmtTrans = forIterStmt(bty, n, mty, cutoff, t.forIterStmtTrans);
-  t.forIterStmtBody = top.forIterStmtBody;
+  top.forIterStmtTrans = forIterStmt(bty, n, mty, cutoff, rest.forIterStmtTrans);
+  rest.forIterStmtBody = top.forIterStmtBody;
 }
 
 {-
@@ -162,21 +145,22 @@ top::IterVars ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr t
 -}
 
 abstract production consAnonIterVar
-top::IterVars ::= cutoff::Expr t::IterVars
+top::IterVars ::= cutoff::Expr rest::IterVars
 {
   --top.pp =
   forwards to
     consIterVar(
       directTypeExpr(cutoff.typerep),
-      name("_iter_var_" ++ toString(genInt()), location=builtin),
       baseTypeExpr(),
-      cutoff, t);
+      name("_iter_var_" ++ toString(genInt()), location=builtin),
+      cutoff, rest);
 }
 
 abstract production nilIterVar
 top::IterVars ::= 
 {
   top.pp = notext();
+  top.errors := [];
   top.iterVarNames = [];
   top.forIterStmtTrans = top.forIterStmtBody;
 }
@@ -185,12 +169,13 @@ synthesized attribute iterVarName::Name;
 
 inherited attribute forIterStmtCutoff::Expr;
 
-nonterminal IterVar with pp, iterVarName, forIterStmtTrans, forIterStmtCutoff, forIterStmtBody;
+nonterminal IterVar with pp, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff, forIterStmtBody, env, returnType;
 
 abstract production iterVar
-top::IterVar ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr
+top::IterVar ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name
 {
   --top.pp =
+  top.errors := bty.errors ++ mty.errors;
   top.iterVarName = n;
   top.forIterStmtTrans = forIterStmt(bty, n, mty, top.forIterStmtCutoff, top.forIterStmtBody);
 }

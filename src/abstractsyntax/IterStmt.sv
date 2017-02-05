@@ -23,7 +23,6 @@ top::Stmt ::= is::IterStmt t::Transformation
     else forward.errors;
   
   t.iterStmtIn = is;
-  t.iterEnvIn = addEnv(is.iterDefs, emptyEnv()); -- Env for transformation consists of only the transformable loop variables
   
   local transResult::IterStmt = t.iterStmtOut;
   transResult.env = top.env;

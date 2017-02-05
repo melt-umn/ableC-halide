@@ -92,7 +92,7 @@ top::IterStmt ::= cond::Expr th::IterStmt el::IterStmt
 }
 
 abstract production forIterStmt
-top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr body::IterStmt
+top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   top.pp = pp"for (${concat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
@@ -161,7 +161,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
   top.errors := bty.errors ++ mty.errors ++ cutoff.errors ++ rest.errors;
   top.iterVarNames = n :: rest.iterVarNames;
   
-  top.forIterStmtTrans = forIterStmt(bty, n, mty, cutoff, rest.forIterStmtTrans);
+  top.forIterStmtTrans = forIterStmt(bty, mty, n, cutoff, rest.forIterStmtTrans);
   rest.forIterStmtBody = top.forIterStmtBody;
 }
 
@@ -207,5 +207,5 @@ top::IterVar ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name
   top.pp = concat([bty.pp, space(), mty.lpp, n.pp, mty.rpp]);
   top.errors := bty.errors ++ mty.errors;
   top.iterVarName = n;
-  top.forIterStmtTrans = forIterStmt(bty, n, mty, top.forIterStmtCutoff, top.forIterStmtBody);
+  top.forIterStmtTrans = forIterStmt(bty, mty, n, top.forIterStmtCutoff, top.forIterStmtBody);
 }

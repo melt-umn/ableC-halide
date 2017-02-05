@@ -1,11 +1,11 @@
 grammar edu:umn:cs:melt:exts:ableC:halide:src:concretesyntax;
 
 terminal Split_t   'split'   lexer classes {Ckeyword};
-terminal Into_t    'into'    lexer classes {Ckeyword};
 terminal Reorder_t 'reorder' lexer classes {Ckeyword};
 terminal Tile_t    'tile'    lexer classes {Ckeyword};
-terminal Block_t   'block'   lexer classes {Ckeyword};
-terminal Size_t    'size'    lexer classes {Ckeyword};
+terminal Unroll_t  'unroll'  lexer classes {Ckeyword};
+
+terminal Into_t    'into'    lexer classes {Ckeyword};
 
 closed nonterminal Transformations_c with location, ast<Transformation>;
 
@@ -24,6 +24,8 @@ concrete productions top::Transformation_c
   { top.ast = reorderTransformation(names.ast, location=top.location); }
 | 'tile' names::Names_c 'into' '(' ics::IntConstants_c ')' ';'
   { top.ast = tileTransformation(names.ast, ics.ast, location=top.location); }
+| 'unroll' id::Identifier_t ';'
+  { top.ast = unrollTransformation(fromId(id), location=top.location); }
 
 closed nonterminal Names_c with ast<Names>;
 

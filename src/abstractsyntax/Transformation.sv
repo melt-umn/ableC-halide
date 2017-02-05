@@ -124,6 +124,27 @@ top::Transformation ::= ns::Names sizes::[Integer]
       location=builtin);
 }
 
+abstract production unrollTransformation
+top::Transformation ::= n::Name
+{
+  top.pp = pp"unroll ${n.pp};";
+  top.errors :=
+     if !null(iterStmt.errors)
+     then iterStmt.errors
+     else (if !null(n.valueLookupCheck)
+           then [err(n.location, "Undeclared loop " ++ n.name)]
+           else []) ++ iterStmt.unrollErrors;
+  
+  n.env = addEnv(iterStmt.iterDefs, emptyEnv());
+ 
+  local iterStmt::IterStmt = top.iterStmtIn;
+  iterStmt.target = n;
+  iterStmt.env = top.env;
+  iterStmt.returnType = top.returnType;
+  
+  top.iterStmtOut = iterStmt.unrollTrans;
+}
+
 synthesized attribute names::[String];
 synthesized attribute loopLookupChecks :: [Message];
 
@@ -160,6 +181,7 @@ autocopy attribute newIterVars::IterVars occurs on IterStmt;
 synthesized attribute splitTrans::IterStmt occurs on IterStmt;
 synthesized attribute insertTrans::IterStmt occurs on IterStmt;
 synthesized attribute reorderTrans::IterStmt occurs on IterStmt, Names;
+synthesized attribute unrollTrans::IterStmt occurs on IterStmt;
 
 -- Aspects for base cases for various transformations
 aspect default production
@@ -173,43 +195,48 @@ top::IterStmt ::=
 aspect production nullIterStmt
 top::IterStmt ::= 
 {
-  propagate splitTrans, reorderTrans;
+  propagate splitTrans, reorderTrans, unrollTrans;
   top.reorderErrors = [];
+  top.unrollErrors = [];
 }
 
 aspect production seqIterStmt
 top::IterStmt ::= h::IterStmt t::IterStmt
 {
-  propagate splitTrans, reorderTrans;
+  propagate splitTrans, reorderTrans, unrollTrans;
   top.reorderErrors = h.reorderErrors ++ t.reorderErrors;
+  top.unrollErrors = h.unrollErrors ++ t.unrollErrors;
 }
 
 aspect production compoundIterStmt
 top::IterStmt ::= is::IterStmt
 {
-  propagate splitTrans, reorderTrans;
+  propagate splitTrans, reorderTrans, unrollTrans;
   top.reorderErrors = is.reorderErrors;
+  top.unrollErrors = is.unrollErrors;
 }
 
 aspect production stmtIterStmt
 top::IterStmt ::= s::Stmt
 {
-  propagate splitTrans, reorderTrans;
+  propagate splitTrans, reorderTrans, unrollTrans;
   top.reorderErrors = [];
+  top.unrollErrors = [];
 }
 
 aspect production condIterStmt
 top::IterStmt ::= cond::Expr th::IterStmt el::IterStmt
 {
-  propagate splitTrans, reorderTrans;
+  propagate splitTrans, reorderTrans, unrollTrans;
   top.reorderErrors = th.reorderErrors ++ el.reorderErrors;
+  top.unrollErrors = th.unrollErrors ++ el.unrollErrors;
 }
 
 -- insertTrans
 autocopy attribute insertedTransFn::(IterStmt ::= IterStmt) occurs on IterStmt;
 
 aspect production forIterStmt
-top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr body::IterStmt
+top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   propagate insertTrans;
 }
@@ -219,6 +246,9 @@ synthesized attribute splitIndexTrans::Expr occurs on IterVars;
 inherited attribute splitIndexTransIn::Expr occurs on IterVars;
 
 synthesized attribute outerCutoffTrans::Expr occurs on IterVars;
+
+synthesized attribute outerCutoffIsConst::Boolean occurs on IterVars;
+synthesized attribute outerCutoffConstVal::Integer occurs on IterVars;
 
 aspect production consIterVar
 top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr rest::IterVars
@@ -240,6 +270,18 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
       numOp(mulOp(location=builtin), location=builtin),
       rest.outerCutoffTrans,
       location=builtin);
+  
+  top.outerCutoffIsConst = 
+    case cutoff of
+      realConstant(integerConstant(num, _, _)) -> rest.outerCutoffIsConst
+    | _ -> false
+    end;
+  
+  top.outerCutoffConstVal =
+    case cutoff of
+      realConstant(integerConstant(num, _, _)) -> toInt(num) * rest.outerCutoffConstVal
+    | _ -> error("cutoff is not a constant")
+    end;
 }
 
 aspect production nilIterVar
@@ -247,10 +289,12 @@ top::IterVars ::=
 {
   top.splitIndexTrans = top.splitIndexTransIn;
   top.outerCutoffTrans = mkIntConst(1, builtin);
+  top.outerCutoffIsConst = true;
+  top.outerCutoffConstVal = 1;
 }
 
 aspect production forIterStmt
-top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr body::IterStmt
+top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   local splitTransBody::IterStmt = body;
   splitTransBody.insertedTransFn =
@@ -278,14 +322,14 @@ top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr b
   splitTransBody.returnType = top.returnType;
   
   local splitIterVars::IterVars = top.newIterVars;
-  splitIterVars.splitIndexTransIn =
-    declRefExpr(spliIterVar.iterVarName, location=builtin);
+  splitIterVars.splitIndexTransIn = declRefExpr(splitIterVar.iterVarName, location=builtin);
   splitIterVars.forIterStmtBody = splitTransBody.insertTrans;
   splitIterVars.env = top.env;
   splitIterVars.returnType = top.returnType;
   
-  local spliIterVar::IterVar = top.newIterVar;
-  spliIterVar.forIterStmtCutoff = -- Calculate ceil(cutoff/product of split indices)
+  local splitIterVar::IterVar = top.newIterVar;
+  
+  local forIterStmtCutoff::Expr = -- Calculate ceil(cutoff/product of split indices)
     mkAdd(
       mkIntConst(1, builtin),
       binaryOpExpr(
@@ -298,12 +342,20 @@ top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr b
         splitIterVars.outerCutoffTrans,
         location=builtin),
       builtin);
-  spliIterVar.forIterStmtBody = splitIterVars.forIterStmtTrans;
+  splitIterVar.forIterStmtCutoff =
+    case cutoff of
+      realConstant(integerConstant(num, _, _)) -> 
+        if splitIterVars.outerCutoffIsConst
+        then mkIntConst(1 + (toInt(num) - 1) / splitIterVars.outerCutoffConstVal, builtin)
+        else forIterStmtCutoff
+    | _ -> forIterStmtCutoff
+    end;
+  splitIterVar.forIterStmtBody = splitIterVars.forIterStmtTrans;
 
   top.splitTrans = 
     if n.name == top.target.name
-    then spliIterVar.forIterStmtTrans
-    else forIterStmt(bty, n, mty, cutoff, body.splitTrans);
+    then splitIterVar.forIterStmtTrans
+    else forIterStmt(bty, mty, n, cutoff, body.splitTrans);
 }
 
 -- reorderTrans
@@ -345,11 +397,11 @@ top::Names ::=
 }
 
 aspect production forIterStmt
-top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr body::IterStmt
+top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   top.reorderConstructors =
     if containsBy(stringEq, n.name, top.targets.names)
-    then pair(n.name, forIterStmt(bty, n, mty, cutoff, _)) :: body.reorderConstructors
+    then pair(n.name, forIterStmt(bty, mty, n, cutoff, _)) :: body.reorderConstructors
     else [];
   
   top.reorderBaseIterStmt =
@@ -369,7 +421,7 @@ top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr b
   top.reorderTrans = 
     if containsBy(stringEq, n.name, top.targets.names)
     then reorderTargets.reorderTrans
-    else forIterStmt(bty, n, mty, cutoff, body.reorderTrans);
+    else forIterStmt(bty, mty, n, cutoff, body.reorderTrans);
 }
 
 -- tileTrans
@@ -398,10 +450,10 @@ top::Names ::= h::Name t::Names
           directTypeExpr(h.valueItem.typerep),
           baseTypeExpr(),
           innerName,
-          mkIntExpr(
-            if !null(top.tileSize) -- Avoid crashing if not enough sizes are given
-            then toString(head(top.tileSize))
-            else "1",
+          mkIntConst(
+            if !null(top.tileSize)
+            then head(top.tileSize)
+            else error("Tile has wrong dimension"),
             builtin),
           nilIterVar()),
         location=builtin),
@@ -417,4 +469,58 @@ top::Names ::=
   top.tileOuterNames = nilName();
   top.tileNames = top.tileOuterNamesIn;
   top.tileTransformation = nullTransformation(location=builtin);
+}
+
+-- unrollTrans
+synthesized attribute unrollErrors::[Message] occurs on IterStmt;
+
+aspect production forIterStmt
+top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
+{
+  local numIters::Integer =
+    case cutoff of
+      realConstant(integerConstant(num, _, _)) -> toInt(num)
+    | _ -> 1 -- Error when cutoff isn't constant, copy body once to catch further errors
+    end;
+    
+  top.unrollErrors =
+    if n.name == top.target.name
+    then
+      case cutoff of
+        realConstant(integerConstant(num, _, _)) -> []
+      | _ -> [err(top.target.location, "Unrolled loop must have constant cutoff")]
+      end
+    else body.unrollErrors;
+
+  top.unrollTrans = 
+    if n.name == top.target.name
+    then unrollBody(bty, mty, n, body, numIters)
+    else forIterStmt(bty, mty, n, cutoff, body.unrollTrans);
+}
+
+function unrollBody
+IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name body::IterStmt numIters::Integer
+{
+  local step::IterStmt =
+    compoundIterStmt(
+      seqIterStmt(
+        stmtIterStmt(
+          declStmt( 
+            variableDecls(
+              [],[],
+              bty,
+              consDeclarator(
+                declarator(
+                  n, mty, [],
+                  justInitializer(
+                    exprInitializer(mkIntExpr(toString(numIters - 1), builtin)))),
+                nilDeclarator())))),
+        body));
+
+  return
+    if numIters > 0
+    then seqIterStmt(unrollBody(bty, mty, n, body, numIters - 1), step)
+    else if numIters == 0
+    then step
+    else nullIterStmt();
 }

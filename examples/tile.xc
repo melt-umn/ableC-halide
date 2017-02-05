@@ -4,7 +4,7 @@ int main (int argc, char **argv) {
   int result[10][10];
 
   transform {
-    for (unsigned x : 10, unsigned y : 10) {
+    for (unsigned x : 11 - 1, unsigned y : 10) {
       result[x][y] = x + y;
     }
   } by {

@@ -19,7 +19,7 @@ nonterminal IterStmt_c with ast<IterStmt>;
 
 concrete productions top::IterStmt_c
 | '{' is::IterStmts_c '}'
-  { top.ast = is.ast; }
+  { top.ast = compoundIterStmt(is.ast); }
 | '{{' l::BlockItemList_c '}' '}'
   { top.ast = stmtIterStmt(foldStmt(l.ast)); }
 | e::Expr_c ';'

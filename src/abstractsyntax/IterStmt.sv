@@ -14,8 +14,10 @@ top::Stmt ::= is::IterStmt t::Transformation
 {
   top.pp = concat([pp"transform ", braces(nestlines(2, is.pp)), pp" by ", braces(nestlines(2, t.pp))]);
   top.errors :=
-    if !null(is.errors ++ t.errors)
-    then is.errors ++ t.errors
+    {-if !null(is.errors) -- iterStmtIn.errors get checked by every transformation that decorates iterStmtIn
+    then is.errors
+    else -}if !null(t.errors)
+    then t.errors
     else if !null(transResult.errors)
     then transResult.errors
     else forward.errors;
@@ -57,6 +59,18 @@ top::IterStmt ::= h::IterStmt t::IterStmt
   t.env = addEnv(h.defs, h.env);
 }
 
+abstract production compoundIterStmt
+top::IterStmt ::= is::IterStmt
+{
+  top.pp = braces(nestlines(2, is.pp));
+  top.errors := is.errors;
+  top.defs = [];
+  top.iterDefs = is.iterDefs;
+  top.hostTrans = compoundStmt(is.hostTrans);
+  
+  is.env = openScope(top.env);
+}
+
 abstract production stmtIterStmt
 top::IterStmt ::= s::Stmt
 {
@@ -67,11 +81,22 @@ top::IterStmt ::= s::Stmt
   top.hostTrans = s;
 }
 
+abstract production condIterStmt
+top::IterStmt ::= cond::Expr th::IterStmt el::IterStmt
+{
+  top.pp = pp"if (${cond.pp})${nestlines(2, th.pp)} else ${nestlines(2, el.pp)}";
+  top.errors := cond.errors ++ th.errors ++ el.errors;
+  
+  top.defs = th.defs ++ el.defs;
+  top.iterDefs = th.iterDefs ++ el.iterDefs;
+  top.hostTrans = ifStmt(cond, th.hostTrans, el.hostTrans);
+}
+
 abstract production forIterStmt
 top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr body::IterStmt
 {
   top.pp = pp"for (${concat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
-  top.errors := bty.errors ++ d.errors ++ cutoff.errors ++ body.errors;
+  top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
   production d::Declarator = declarator(n, mty, [], nothingInitializer());
   d.env = openScope(top.env);
@@ -81,7 +106,7 @@ top::IterStmt ::= bty::BaseTypeExpr n::Name mty::TypeModifierExpr cutoff::Expr b
   d.givenAttributes = [];
   d.returnType = top.returnType;
   
-  top.defs = valueDef(n.name, declaratorValueItem(d)) :: body.defs;
+  top.defs = [];
   top.iterDefs = valueDef(n.name, declaratorValueItem(d)) :: body.iterDefs;
   top.hostTrans =
     compoundStmt(
@@ -121,17 +146,6 @@ top::IterStmt ::= ivs::IterVars body::IterStmt
   
   ivs.forIterStmtBody = body;
   forwards to ivs.forIterStmtTrans;
-}
-
-abstract production condIterStmt
-top::IterStmt ::= cond::Expr th::IterStmt el::IterStmt
-{
-  top.pp = pp"if (${cond.pp})${nestlines(2, th.pp)} else ${nestlines(2, el.pp)}";
-  top.errors := cond.errors ++ th.errors ++ el.errors;
-  
-  top.defs = th.defs ++ el.defs;
-  top.iterDefs = th.iterDefs ++ el.iterDefs;
-  top.hostTrans = ifStmt(cond, th.hostTrans, el.hostTrans);
 }
 
 synthesized attribute iterVarNames::[Name];

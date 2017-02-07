@@ -238,7 +238,16 @@ abstract production consIterVar
 top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr rest::IterVars
 {
   top.pp = concat([bty.pp, space(), mty.lpp, n.pp, mty.rpp, text(" : "), cutoff.pp, comma(), space(), rest.pp]);
-  top.errors := bty.errors ++ mty.errors ++ cutoff.errors ++ rest.errors;
+  top.errors :=
+    bty.errors ++ mty.errors ++ cutoff.errors ++
+    case cutoff of
+      realConstant(integerConstant(num, _, _)) ->
+        if toInt(num) < 1
+        then [err(cutoff.location, "Split loop size must be >= 1")]
+        else []
+    | _ -> []
+    end ++
+    rest.errors;
   top.iterVarNames = n :: rest.iterVarNames;
   
   top.forIterStmtTrans = forIterStmt(bty, mty, n, cutoff, rest.forIterStmtTrans);

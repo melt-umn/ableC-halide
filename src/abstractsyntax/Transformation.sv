@@ -429,25 +429,26 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   local splitTransBody::IterStmt = body;
   splitTransBody.insertedTransFn =
     \ innerBody::IterStmt ->
-      seqIterStmt(
-        stmtIterStmt(
-          declStmt( 
-            variableDecls(
-              [], [],
-              directTypeExpr(d.typerep),
-              consDeclarator( 
-                declarator(
-                  n, baseTypeExpr(), [],
-                  justInitializer(exprInitializer(splitIterVars.splitIndexTrans))), 
-                  nilDeclarator())))),
-        condIterStmt(
-          binaryOpExpr(
-            declRefExpr(n, location=builtin),
-            compareOp(ltOp(location=builtin), location=builtin),
-            cutoff,
-            location=builtin),
-          innerBody,
-          nullIterStmt()));
+      compoundIterStmt(
+        seqIterStmt(
+          stmtIterStmt(
+            declStmt( 
+              variableDecls(
+                [], [],
+                directTypeExpr(d.typerep),
+                consDeclarator( 
+                  declarator(
+                    n, baseTypeExpr(), [],
+                    justInitializer(exprInitializer(splitIterVars.splitIndexTrans))), 
+                    nilDeclarator())))),
+          condIterStmt(
+            binaryOpExpr(
+              declRefExpr(n, location=builtin),
+              compareOp(ltOp(location=builtin), location=builtin),
+              cutoff,
+              location=builtin),
+            innerBody,
+            nullIterStmt())));
   splitTransBody.env = top.env;
   splitTransBody.returnType = top.returnType;
   

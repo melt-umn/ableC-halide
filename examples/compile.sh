@@ -17,4 +17,4 @@ basefilename="${filename_withoutpath%.*}"
 
 cfile="${basefilename}.c"
 
-gcc ${cfile}
+gcc ${cfile} -fopenmp

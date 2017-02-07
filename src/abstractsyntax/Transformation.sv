@@ -32,7 +32,7 @@ top::Transformation ::= n::Name iv::IterVar ivs::IterVars
      if !null(iterStmt.errors)
      then iterStmt.errors
      else (if !null(n.valueLookupCheck)
-           then [err(n.location, "Undeclared loop " ++ n.name)]
+           then [err(n.location, n.name ++ " is not a transformable loop")]
            else []) ++ iv.errors ++ ivs.errors;
   
   n.env = addEnv(iterStmt.iterDefs, emptyEnv()); -- Env for name lookup consists of only the transformable loop variables
@@ -132,17 +132,69 @@ top::Transformation ::= n::Name
      if !null(iterStmt.errors)
      then iterStmt.errors
      else (if !null(n.valueLookupCheck)
-           then [err(n.location, "Undeclared loop " ++ n.name)]
+           then [err(n.location, n.name ++ " is not a transformable loop")]
            else []) ++ iterStmt.unrollErrors;
   
   n.env = addEnv(iterStmt.iterDefs, emptyEnv());
- 
+  
   local iterStmt::IterStmt = top.iterStmtIn;
   iterStmt.target = n;
   iterStmt.env = top.env;
   iterStmt.returnType = top.returnType;
   
   top.iterStmtOut = iterStmt.unrollTrans;
+}
+
+abstract production parallelizeTransformation
+top::Transformation ::= n::Name numThreads::Maybe<Integer>
+{
+  local numThreadsPP::Document =
+    case numThreads of
+      just(n) -> pp" into (${text(toString(n))}) threads"
+    | nothing() -> notext()
+    end;
+  top.pp = pp"parallelize ${n.pp}${numThreadsPP};";
+  top.errors :=
+     if !null(iterStmt.errors)
+     then iterStmt.errors
+     else (if !null(n.valueLookupCheck)
+           then [err(n.location, n.name ++ " is not a transformable loop")]
+           else []) ++ iterStmt.parallelizeErrors;
+  
+  n.env = addEnv(iterStmt.iterDefs, emptyEnv());
+  
+  local iterStmt::IterStmt = top.iterStmtIn;
+  iterStmt.target = n;
+  iterStmt.inParallel = false;
+  iterStmt.inVector = false;
+  iterStmt.numThreads = numThreads;
+  iterStmt.env = top.env;
+  iterStmt.returnType = top.returnType;
+  
+  top.iterStmtOut = iterStmt.parallelizeTrans;
+}
+
+abstract production vectorizeTransformation
+top::Transformation ::= n::Name
+{
+  top.pp = pp"vectorize ${n.pp};";
+  top.errors :=
+     if !null(iterStmt.errors)
+     then iterStmt.errors
+     else (if !null(n.valueLookupCheck)
+           then [err(n.location, n.name ++ " is not a transformable loop")]
+           else []) ++ iterStmt.vectorizeErrors;
+  
+  n.env = addEnv(iterStmt.iterDefs, emptyEnv());
+  
+  local iterStmt::IterStmt = top.iterStmtIn;
+  iterStmt.target = n;
+  iterStmt.inParallel = false;
+  iterStmt.inVector = false;
+  iterStmt.env = top.env;
+  iterStmt.returnType = top.returnType;
+  
+  top.iterStmtOut = iterStmt.vectorizeTrans;
 }
 
 synthesized attribute names::[String];
@@ -158,7 +210,7 @@ top::Names ::= h::Name t::Names
   top.count = t.count + 1;
   top.loopLookupChecks =
     (if !null(h.valueLookupCheck)
-     then [err(h.location, "Undeclared loop " ++ h.name)]
+     then [err(h.location, h.name ++ " is not a transformable loop")]
      else []) ++ t.loopLookupChecks;
 }
 
@@ -177,11 +229,28 @@ autocopy attribute targets::Names occurs on IterStmt;
 autocopy attribute newIterVar::IterVar occurs on IterStmt;
 autocopy attribute newIterVars::IterVars occurs on IterStmt;
 
+autocopy attribute insertedTransFn::(IterStmt ::= IterStmt) occurs on IterStmt;
+autocopy attribute inParallel::Boolean occurs on IterStmt;
+autocopy attribute numThreads::Maybe<Integer> occurs on IterStmt;
+autocopy attribute inVector::Boolean occurs on IterStmt;
+
 -- Functor attributes that perform various transformations
 synthesized attribute splitTrans::IterStmt occurs on IterStmt;
 synthesized attribute insertTrans::IterStmt occurs on IterStmt;
-synthesized attribute reorderTrans::IterStmt occurs on IterStmt, Names;
+synthesized attribute reorderTrans::IterStmt occurs on IterStmt;
 synthesized attribute unrollTrans::IterStmt occurs on IterStmt;
+synthesized attribute parallelizeTrans::IterStmt occurs on IterStmt;
+synthesized attribute vectorizeTrans::IterStmt occurs on IterStmt;
+
+-- Monoid attributes to collect errors for various transformations
+synthesized attribute reorderErrors::[Message] occurs on IterStmt;
+synthesized attribute unrollErrors::[Message] occurs on IterStmt;
+synthesized attribute parallelizeErrors::[Message] occurs on IterStmt;
+synthesized attribute vectorizeErrors::[Message] occurs on IterStmt;
+
+-- Other misc analysis attributes used by various transformations
+synthesized attribute isParallel::Boolean occurs on IterStmt;
+synthesized attribute isVector::Boolean occurs on IterStmt;
 
 -- Aspects for base cases for various transformations
 aspect default production
@@ -195,46 +264,107 @@ top::IterStmt ::=
 aspect production nullIterStmt
 top::IterStmt ::= 
 {
-  propagate splitTrans, reorderTrans, unrollTrans;
+  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
+  
   top.reorderErrors = [];
   top.unrollErrors = [];
+  top.parallelizeErrors = [];
+  top.vectorizeErrors = [];
+  
+  top.isParallel = false;
+  top.isVector = false;
 }
 
 aspect production seqIterStmt
 top::IterStmt ::= h::IterStmt t::IterStmt
 {
-  propagate splitTrans, reorderTrans, unrollTrans;
+  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
+  
   top.reorderErrors = h.reorderErrors ++ t.reorderErrors;
   top.unrollErrors = h.unrollErrors ++ t.unrollErrors;
+  top.parallelizeErrors = h.parallelizeErrors ++ t.parallelizeErrors;
+  top.vectorizeErrors = h.vectorizeErrors ++ t.vectorizeErrors;
+  
+  top.isParallel = h.isParallel || t.isParallel;
+  top.isVector = h.isVector || t.isVector;
 }
 
 aspect production compoundIterStmt
 top::IterStmt ::= is::IterStmt
 {
-  propagate splitTrans, reorderTrans, unrollTrans;
+  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
+  
   top.reorderErrors = is.reorderErrors;
   top.unrollErrors = is.unrollErrors;
+  top.parallelizeErrors = is.parallelizeErrors;
+  top.vectorizeErrors = is.vectorizeErrors;
+  
+  top.isParallel = is.isParallel;
+  top.isVector = is.isVector;
 }
 
 aspect production stmtIterStmt
 top::IterStmt ::= s::Stmt
 {
-  propagate splitTrans, reorderTrans, unrollTrans;
+  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
+  
   top.reorderErrors = [];
   top.unrollErrors = [];
+  top.parallelizeErrors = [];
+  top.vectorizeErrors = [];
+  
+  top.isParallel = false;
+  top.isVector = false;
 }
 
 aspect production condIterStmt
 top::IterStmt ::= cond::Expr th::IterStmt el::IterStmt
 {
-  propagate splitTrans, reorderTrans, unrollTrans;
+  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
+  
   top.reorderErrors = th.reorderErrors ++ el.reorderErrors;
   top.unrollErrors = th.unrollErrors ++ el.unrollErrors;
+  top.parallelizeErrors = th.parallelizeErrors ++ el.parallelizeErrors;
+  top.vectorizeErrors = th.vectorizeErrors ++ el.vectorizeErrors;
+  
+  top.isParallel = th.isParallel || el.isParallel;
+  top.isVector = th.isVector || el.isVector;
+}
+
+aspect production parallelForIterStmt
+top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
+{
+  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
+  
+  top.reorderErrors = body.reorderErrors;
+  top.unrollErrors = body.unrollErrors;
+  top.parallelizeErrors = body.parallelizeErrors;
+  top.vectorizeErrors = body.vectorizeErrors;
+  
+  top.isParallel = true;
+  top.isVector = false;
+  
+  body.inParallel = true;
+}
+
+aspect production vectorForIterStmt
+top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
+{
+  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
+  
+  top.reorderErrors = body.reorderErrors;
+  top.unrollErrors = body.unrollErrors;
+  top.parallelizeErrors = body.parallelizeErrors;
+  top.vectorizeErrors = body.vectorizeErrors;
+  
+  top.isParallel = false;
+  top.isVector = true;
+  
+  body.inParallel = true;
+  body.inVector = true;
 }
 
 -- insertTrans
-autocopy attribute insertedTransFn::(IterStmt ::= IterStmt) occurs on IterStmt;
-
 aspect production forIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
@@ -365,7 +495,8 @@ autocopy attribute reorderBaseIterStmtIn::IterStmt occurs on Names;
 synthesized attribute reorderConstructors::[Pair<String (IterStmt ::= IterStmt)>] occurs on IterStmt;
 synthesized attribute reorderBaseIterStmt::IterStmt occurs on IterStmt;
 
-synthesized attribute reorderErrors::[Message] occurs on IterStmt, Names;
+attribute reorderErrors occurs on Names;
+attribute reorderTrans occurs on Names;
 
 aspect production consName
 top::Names ::= h::Name t::Names
@@ -472,8 +603,6 @@ top::Names ::=
 }
 
 -- unrollTrans
-synthesized attribute unrollErrors::[Message] occurs on IterStmt;
-
 aspect production forIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
@@ -494,7 +623,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
 
   top.unrollTrans = 
     if n.name == top.target.name
-    then unrollBody(bty, mty, n, body, numIters)
+    then compoundIterStmt(unrollBody(bty, mty, n, body, numIters))
     else forIterStmt(bty, mty, n, cutoff, body.unrollTrans);
 }
 
@@ -518,9 +647,52 @@ IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name body::IterStmt numI
         body));
 
   return
-    if numIters > 0
+    if numIters > 1
     then seqIterStmt(unrollBody(bty, mty, n, body, numIters - 1), step)
-    else if numIters == 0
+    else if numIters == 1
     then step
     else nullIterStmt();
+}
+
+-- parallelizeTrans
+aspect production forIterStmt
+top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
+{
+  top.isParallel = body.isParallel;
+
+  top.parallelizeErrors =
+    (if top.inParallel
+     then [wrn(top.target.location, n.name ++ " is already within a parallel section, parallelizing will have no effect")]
+     else []) ++ 
+    (if body.isParallel
+     then [wrn(top.target.location, n.name ++ " contains a parallel section that will be hidden")]
+     else []) ++ body.parallelizeErrors;
+  
+  top.parallelizeTrans = 
+    if n.name == top.target.name
+    then parallelForIterStmt(top.numThreads, bty, mty, n, cutoff, body.parallelizeTrans)
+    else forIterStmt(bty, mty, n, cutoff, body.parallelizeTrans);
+}
+
+-- vectorizeTrans
+aspect production forIterStmt
+top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
+{
+  top.isVector = body.isVector;
+
+  top.vectorizeErrors =
+    (if top.inVector
+     then [err(top.target.location, n.name ++ " is already within a vector section and cannot be vectorized")]
+     else []) ++ 
+    (if top.isVector
+     then [err(top.target.location, n.name ++ " contains a vector section and cannot be vectorized")]
+     else []) ++ 
+    (if body.isParallel
+     then [wrn(top.target.location, n.name ++ " contains a parallel section and cannot be vectorized")]
+     else []) ++ body.vectorizeErrors;
+  
+  top.vectorizeTrans = 
+    if n.name == top.target.name
+    then vectorForIterStmt(bty, mty, n, cutoff, body.vectorizeTrans)
+    else forIterStmt(bty, mty, n, cutoff, body.vectorizeTrans);
 }

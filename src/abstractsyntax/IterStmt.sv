@@ -120,7 +120,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
             binaryOpExpr(
               declRefExpr(n, location=builtin),
               assignOp(eqOp(location=builtin), location=builtin),
-              mkIntExpr("0", builtin),
+              mkIntConst(0, builtin),
               location=builtin)),
           justExpr(
             binaryOpExpr(
@@ -145,6 +145,86 @@ top::IterStmt ::= ivs::IterVars body::IterStmt
   
   ivs.forIterStmtBody = body;
   forwards to ivs.forIterStmtTrans;
+}
+
+abstract production parallelForIterStmt
+top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
+{
+  local numThreadsPP::Document =
+    case numThreads of
+      just(n) -> parens(text(toString(n)))
+    | nothing() -> notext()
+    end;
+  top.pp = pp"for parallel${numThreadsPP} (${concat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
+  top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
+  
+  production d::Declarator = declarator(n, mty, [], nothingInitializer());
+  d.env = openScope(top.env);
+  d.baseType = bty.typerep;
+  d.isTopLevel = false;
+  d.isTypedef = false;
+  d.givenAttributes = [];
+  d.returnType = top.returnType;
+  
+  top.defs = [];
+  top.iterDefs = body.iterDefs;
+  
+  {- TODO: We don't right now have a way to insert pragmas via abstract syntax, and OpenMP is
+   - rather picky about the loop variable being declared in the loop and extra parentheses in the
+   - predicate, so we need to resort to some hacks with txtStmt for now.
+   -}
+  top.hostTrans =
+    compoundStmt(
+      foldStmt([
+        declStmt( -- Still re-declare the loop variable in the ast, so it shows up in env for the host error check
+          variableDecls(
+            [],[],
+            bty,
+            consDeclarator(d, nilDeclarator()))),
+        case numThreads of
+          just(n) -> txtStmt(s"#pragma omp parallel for num_threads(${toString(n)})")
+        | nothing() -> txtStmt("#pragma omp parallel for")
+        end,
+        txtStmt(s"for (${show(80, bty.pp)} ${show(80, head(d.pps))} = 0; ${n.name} < ${show(80, cutoff.pp)}; ${n.name}++)"),
+        body.hostTrans]));
+  
+  body.env = addEnv(d.defs, openScope(top.env));
+}
+
+abstract production vectorForIterStmt
+top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
+{
+  top.pp = pp"for vector (${concat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
+  top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
+  
+  production d::Declarator = declarator(n, mty, [], nothingInitializer());
+  d.env = openScope(top.env);
+  d.baseType = bty.typerep;
+  d.isTopLevel = false;
+  d.isTypedef = false;
+  d.givenAttributes = [];
+  d.returnType = top.returnType;
+  
+  top.defs = [];
+  top.iterDefs = body.iterDefs;
+  
+  {- TODO: We don't right now have a way to insert pragmas via abstract syntax, and OpenMP is
+   - rather picky about the loop variable being declared in the loop and extra parentheses in the
+   - predicate, so we need to resort to some hacks with txtStmt for now.
+   -}
+  top.hostTrans =
+    compoundStmt(
+      foldStmt([
+        declStmt( -- Still re-declare the loop variable in the ast, so it shows up in env for the host error check
+          variableDecls(
+            [],[],
+            bty,
+            consDeclarator(d, nilDeclarator()))),
+        txtStmt("#pragma omp simd"),
+        txtStmt(s"for (${show(80, bty.pp)} ${show(80, head(d.pps))} = 0; ${n.name} < ${show(80, cutoff.pp)}; ${n.name}++)"),
+        body.hostTrans]));
+  
+  body.env = addEnv(d.defs, openScope(top.env));
 }
 
 synthesized attribute iterVarNames::[Name];

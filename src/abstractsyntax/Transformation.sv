@@ -28,12 +28,14 @@ abstract production splitTransformation
 top::Transformation ::= n::Name iv::IterVar ivs::IterVars
 {
   top.pp = pp"split ${n.pp} into (${iv.pp}, ${ivs.pp});";
-  top.errors :=
+  top.errors := iv.errors ++ ivs.errors;
+  
+  top.errors <-
      if !null(iterStmt.errors)
      then iterStmt.errors
      else (if !null(n.valueLookupCheck)
            then [err(n.location, n.name ++ " is not a transformable loop")]
-           else []) ++ iv.errors ++ ivs.errors;
+           else []);
   
   n.env = addEnv(iterStmt.iterDefs, emptyEnv()); -- Env for name lookup consists of only the transformable loop variables
  

@@ -254,15 +254,6 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
   rest.forIterStmtBody = top.forIterStmtBody;
 }
 
-{-
-
-    case cutoff of
-      realConstant(integerConstant(num, unsigned, suffix)) ->
-        constForIterStmt(bt, d, toInt(num), unsigned, suffix, t.forIterStmtTrans)
-    | _ -> forIterStmt(bt, d, cutoff, t.forIterStmtTrans)
-    end;
--}
-
 abstract production consAnonIterVar
 top::IterVars ::= cutoff::Expr rest::IterVars
 {

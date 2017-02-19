@@ -17,7 +17,7 @@ void matmul(unsigned m, unsigned n, unsigned p,
     for (unsigned i : m, unsigned j : n) {
       c[i][j] = 0;
       for (unsigned k : p) {
-        c[i][j] += a[i][k] + b[k][j];
+        c[i][j] += a[i][k] * b[k][j];
       }
     }
   } by {
@@ -39,7 +39,7 @@ void matmul_gold(unsigned m, unsigned n, unsigned p,
     for (unsigned i : m, unsigned j : n) {
       c[i][j] = 0;
       for (unsigned k : p) {
-        c[i][j] += a[i][k] + b[k][j];
+        c[i][j] += a[i][k] * b[k][j];
       }
     }
   } by {}

@@ -41,7 +41,7 @@ top::IterStmt ::=
 {
   top.pp = notext();
   top.errors := [];
-  top.defs = [];
+  top.defs := [];
   top.iterDefs = [];
   top.hostTrans = nullStmt();
 }
@@ -51,7 +51,7 @@ top::IterStmt ::= h::IterStmt t::IterStmt
 {
   top.pp = concat([ h.pp, line(), t.pp ]);
   top.errors := h.errors ++ t.errors;
-  top.defs = h.defs ++ t.defs;
+  top.defs := h.defs ++ t.defs;
   top.iterDefs = h.iterDefs ++ t.iterDefs;
   top.hostTrans = seqStmt(h.hostTrans, t.hostTrans);
   
@@ -63,7 +63,7 @@ top::IterStmt ::= is::IterStmt
 {
   top.pp = braces(nestlines(2, is.pp));
   top.errors := is.errors;
-  top.defs = [];
+  top.defs := [];
   top.iterDefs = is.iterDefs;
   top.hostTrans = compoundStmt(is.hostTrans);
   
@@ -75,7 +75,7 @@ top::IterStmt ::= s::Stmt
 {
   top.pp = braces(braces(nestlines(2, s.pp)));
   top.errors := s.errors;
-  top.defs = s.defs;
+  top.defs := s.defs;
   top.iterDefs = [];
   top.hostTrans = s;
 }
@@ -86,7 +86,7 @@ top::IterStmt ::= cond::Expr th::IterStmt el::IterStmt
   top.pp = pp"if (${cond.pp})${nestlines(2, th.pp)} else ${nestlines(2, el.pp)}";
   top.errors := cond.errors ++ th.errors ++ el.errors;
   
-  top.defs = th.defs ++ el.defs;
+  top.defs := th.defs ++ el.defs;
   top.iterDefs = th.iterDefs ++ el.iterDefs;
   top.hostTrans = ifStmt(cond, th.hostTrans, el.hostTrans);
 }
@@ -105,7 +105,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   d.givenAttributes = [];
   d.returnType = top.returnType;
   
-  top.defs = [];
+  top.defs := [];
   top.iterDefs = valueDef(n.name, declaratorValueItem(d)) :: body.iterDefs;
   top.hostTrans =
     compoundStmt(
@@ -166,7 +166,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   d.givenAttributes = [];
   d.returnType = top.returnType;
   
-  top.defs = [];
+  top.defs := [];
   top.iterDefs = body.iterDefs;
   
   {- TODO: We don't right now have a way to insert pragmas via abstract syntax, and OpenMP is
@@ -205,7 +205,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   d.givenAttributes = [];
   d.returnType = top.returnType;
   
-  top.defs = [];
+  top.defs := [];
   top.iterDefs = body.iterDefs;
   
   {- TODO: We don't right now have a way to insert pragmas via abstract syntax, and OpenMP is

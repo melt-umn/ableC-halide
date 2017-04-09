@@ -110,7 +110,7 @@ top::Transformation ::= ns::Names sizes::[Integer]
      else forward.errors;
   
   ns.tileSize = sizes;
-  ns.tileOuterNamesIn = ns.tileOuterNames;
+  ns.tileInnerNamesIn = ns.tileInnerNames;
   ns.env = addEnv(iterStmt.iterDefs, emptyEnv());
   
   -- Decorate iterStmtIn to check loops are contiguous before splitting loops and reordering via forward
@@ -560,20 +560,20 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
 
 -- tileTrans
 autocopy attribute tileSize::[Integer] occurs on Names;
-autocopy attribute tileOuterNamesIn::Names occurs on Names;
+autocopy attribute tileInnerNamesIn::Names occurs on Names;
 
-synthesized attribute tileOuterNames::Names occurs on Names;
+synthesized attribute tileInnerNames::Names occurs on Names;
 synthesized attribute tileNames::Names occurs on Names;
 synthesized attribute tileTransformation::Transformation occurs on Names;
 
 aspect production consName
 top::Names ::= h::Name t::Names
 {
-  local outerName::Name = name(h.name ++ "_outer", location=builtin);
   local innerName::Name = name(h.name ++ "_inner", location=builtin);
+  local outerName::Name = name(h.name ++ "_outer", location=builtin);
   
-  top.tileOuterNames = consName(outerName, t.tileOuterNames);
-  top.tileNames = consName(innerName, t.tileNames);
+  top.tileInnerNames = consName(innerName, t.tileInnerNames);
+  top.tileNames = consName(outerName, t.tileNames);
 
   top.tileTransformation =
     seqTransformation(
@@ -600,8 +600,8 @@ top::Names ::= h::Name t::Names
 aspect production nilName
 top::Names ::= 
 {
-  top.tileOuterNames = nilName();
-  top.tileNames = top.tileOuterNamesIn;
+  top.tileInnerNames = nilName();
+  top.tileNames = top.tileInnerNamesIn;
   top.tileTransformation = nullTransformation(location=builtin);
 }
 

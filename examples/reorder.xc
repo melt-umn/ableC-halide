@@ -10,7 +10,7 @@ int main (int argc, char **argv) {
   } by {
     split x into (unsigned x_outer, unsigned x_inner : 4);
     split y into (unsigned y_outer, unsigned y_inner : 4);
-    reorder x_inner, y_inner, x_outer, y_outer;
+    reorder x_outer, y_outer, x_inner, y_inner;
   }
   
   transform {

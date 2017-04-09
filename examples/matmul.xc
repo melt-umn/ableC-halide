@@ -3,11 +3,11 @@
 #include <sys/time.h>
 
 #define NUM_THREADS 8
-#define TILE_DIM 200
-#define UNROLL_SIZE 50
-#define VECTOR_SIZE 4
+#define TILE_DIM 70
+#define UNROLL_SIZE 5
+#define VECTOR_SIZE 8
 
-#define M 500
+#define M 700
 #define N 1000
 #define P 2000
 

@@ -1,7 +1,7 @@
 grammar edu:umn:cs:melt:exts:ableC:halide:src:abstractsyntax;
 
 imports silver:langutil;
-imports silver:langutil:pp with implode as ppImplode;
+imports silver:langutil:pp with implode as ppImplode, concat as ppConcat;
 
 imports edu:umn:cs:melt:ableC:abstractsyntax;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
@@ -12,7 +12,8 @@ global builtin::Location = builtinLoc("halide");
 abstract production iterateStmt
 top::Stmt ::= is::IterStmt t::Transformation
 {
-  top.pp = concat([pp"transform ", braces(nestlines(2, is.pp)), pp" by ", braces(nestlines(2, t.pp))]);
+  top.pp =
+    ppConcat([pp"transform ", braces(nestlines(2, is.pp)), pp" by ", braces(nestlines(2, t.pp))]);
   top.errors :=
     {-if !null(is.errors) -- iterStmtIn.errors get checked by every transformation that decorates iterStmtIn
     then is.errors
@@ -49,7 +50,7 @@ top::IterStmt ::=
 abstract production seqIterStmt
 top::IterStmt ::= h::IterStmt t::IterStmt
 {
-  top.pp = concat([ h.pp, line(), t.pp ]);
+  top.pp = ppConcat([ h.pp, line(), t.pp ]);
   top.errors := h.errors ++ t.errors;
   top.defs := h.defs ++ t.defs;
   top.iterDefs = h.iterDefs ++ t.iterDefs;
@@ -94,7 +95,7 @@ top::IterStmt ::= cond::Expr th::IterStmt el::IterStmt
 abstract production forIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
-  top.pp = pp"for (${concat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
+  top.pp = pp"for (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
   production d::Declarator = declarator(n, mty, [], nothingInitializer());
@@ -155,7 +156,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
       just(n) -> parens(text(toString(n)))
     | nothing() -> notext()
     end;
-  top.pp = pp"for parallel${numThreadsPP} (${concat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
+  top.pp = pp"for parallel${numThreadsPP} (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
   production d::Declarator = declarator(n, mty, [], nothingInitializer());
@@ -194,7 +195,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
 abstract production vectorForIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
-  top.pp = pp"for vector (${concat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
+  top.pp = pp"for vector (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
   production d::Declarator = declarator(n, mty, [], nothingInitializer());
@@ -237,7 +238,7 @@ nonterminal IterVars with pp, errors, iterVarNames, forIterStmtTrans, forIterStm
 abstract production consIterVar
 top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr rest::IterVars
 {
-  top.pp = concat([bty.pp, space(), mty.lpp, n.pp, mty.rpp, text(" : "), cutoff.pp, comma(), space(), rest.pp]);
+  top.pp = ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp, text(" : "), cutoff.pp, comma(), space(), rest.pp]);
   top.errors :=
     bty.errors ++ mty.errors ++ cutoff.errors ++
     case cutoff of
@@ -257,7 +258,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
 abstract production consAnonIterVar
 top::IterVars ::= cutoff::Expr rest::IterVars
 {
-  top.pp = concat([cutoff.pp, comma(), rest.pp]);
+  top.pp = ppConcat([cutoff.pp, comma(), rest.pp]);
   forwards to
     consIterVar(
       directTypeExpr(cutoff.typerep),
@@ -284,7 +285,7 @@ nonterminal IterVar with pp, errors, iterVarName, forIterStmtTrans, forIterStmtC
 abstract production iterVar
 top::IterVar ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name
 {
-  top.pp = concat([bty.pp, space(), mty.lpp, n.pp, mty.rpp]);
+  top.pp = ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp]);
   top.errors := bty.errors ++ mty.errors;
   top.iterVarName = n;
   top.forIterStmtTrans = forIterStmt(bty, mty, n, top.forIterStmtCutoff, top.forIterStmtBody);

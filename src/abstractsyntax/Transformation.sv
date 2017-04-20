@@ -16,7 +16,7 @@ top::Transformation ::=
 abstract production seqTransformation
 top::Transformation ::= h::Transformation t::Transformation
 {
-  top.pp = concat([h.pp, line(), t.pp]);
+  top.pp = ppConcat([h.pp, line(), t.pp]);
   top.errors := if !null(h.errors) then h.errors else t.errors;
   
   h.iterStmtIn = top.iterStmtIn;

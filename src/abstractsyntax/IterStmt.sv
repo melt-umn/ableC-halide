@@ -1,7 +1,7 @@
 grammar edu:umn:cs:melt:exts:ableC:halide:src:abstractsyntax;
 
 imports silver:langutil;
-imports silver:langutil:pp with implode as ppImplode, concat as ppConcat;
+imports silver:langutil:pp;
 
 imports edu:umn:cs:melt:ableC:abstractsyntax;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
@@ -98,12 +98,12 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   top.pp = pp"for (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
-  production d::Declarator = declarator(n, mty, [], nothingInitializer());
+  production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openScope(top.env);
   d.baseType = bty.typerep;
   d.isTopLevel = false;
   d.isTypedef = false;
-  d.givenAttributes = [];
+  d.givenAttributes = nilAttribute();
   d.returnType = top.returnType;
   
   top.defs := [];
@@ -113,7 +113,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
       seqStmt(
         declStmt( 
           variableDecls(
-            [],[],
+            [], nilAttribute(),
             bty,
             consDeclarator(d, nilDeclarator()))),
         forStmt(
@@ -159,12 +159,12 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   top.pp = pp"for parallel${numThreadsPP} (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
-  production d::Declarator = declarator(n, mty, [], nothingInitializer());
+  production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openScope(top.env);
   d.baseType = bty.typerep;
   d.isTopLevel = false;
   d.isTypedef = false;
-  d.givenAttributes = [];
+  d.givenAttributes = nilAttribute();
   d.returnType = top.returnType;
   
   top.defs := [];
@@ -179,7 +179,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
       foldStmt([
         declStmt( -- Still re-declare the loop variable in the ast, so it shows up in env for the host error check
           variableDecls(
-            [],[],
+            [], nilAttribute(),
             bty,
             consDeclarator(d, nilDeclarator()))),
         case numThreads of
@@ -198,12 +198,12 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   top.pp = pp"for vector (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
-  production d::Declarator = declarator(n, mty, [], nothingInitializer());
+  production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openScope(top.env);
   d.baseType = bty.typerep;
   d.isTopLevel = false;
   d.isTypedef = false;
-  d.givenAttributes = [];
+  d.givenAttributes = nilAttribute();
   d.returnType = top.returnType;
   
   top.defs := [];
@@ -218,7 +218,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
       foldStmt([
         declStmt( -- Still re-declare the loop variable in the ast, so it shows up in env for the host error check
           variableDecls(
-            [],[],
+            [], nilAttribute(),
             bty,
             consDeclarator(d, nilDeclarator()))),
         txtStmt("#pragma omp simd"),

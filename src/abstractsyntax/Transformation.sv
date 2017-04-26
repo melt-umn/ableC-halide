@@ -436,11 +436,11 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
           stmtIterStmt(
             declStmt( 
               variableDecls(
-                [], [],
+                [], nilAttribute(),
                 directTypeExpr(d.typerep),
                 consDeclarator( 
                   declarator(
-                    n, baseTypeExpr(), [],
+                    n, baseTypeExpr(), nilAttribute(),
                     justInitializer(exprInitializer(splitIterVars.splitIndexTrans))), 
                     nilDeclarator())))),
           condIterStmt(
@@ -639,11 +639,11 @@ IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name body::IterStmt numI
         stmtIterStmt(
           declStmt( 
             variableDecls(
-              [],[],
+              [], nilAttribute(),
               bty,
               consDeclarator(
                 declarator(
-                  n, mty, [],
+                  n, mty, nilAttribute(),
                   justInitializer(
                     exprInitializer(mkIntExpr(toString(numIters - 1), builtin)))),
                 nilDeclarator())))),

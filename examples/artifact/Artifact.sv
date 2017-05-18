@@ -1,4 +1,4 @@
-grammar edu:umn:cs:melt:exts:ableC:halide:artifact;
+grammar artifact;
 
 {- This Silver specification does litte more than list the desired
    extensions, albeit in a somewhat stylized way.

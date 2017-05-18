@@ -1,4 +1,4 @@
-grammar edu:umn:cs:melt:exts:ableC:halide:src:concretesyntax;
+grammar edu:umn:cs:melt:exts:ableC:halide:concretesyntax;
 
 -- For double-brace-enclosed statments
 -- We need to use the RCurly_t terminal from ableC to close the scope, to avoid issues with the mda

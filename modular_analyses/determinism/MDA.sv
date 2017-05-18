@@ -1,6 +1,6 @@
-grammar edu:umn:cs:melt:exts:ableC:halide:modular_analyses:determinism ;
+grammar determinism;
 
-import edu:umn:cs:melt:ableC:host ;
+import edu:umn:cs:melt:ableC:host;
 
 copper_mda testStmt(ablecParser) {
   edu:umn:cs:melt:ableC:host;

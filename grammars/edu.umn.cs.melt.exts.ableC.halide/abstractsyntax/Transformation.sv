@@ -1,4 +1,4 @@
-grammar edu:umn:cs:melt:exts:ableC:halide:src:abstractsyntax;
+grammar edu:umn:cs:melt:exts:ableC:halide:abstractsyntax;
 
 inherited attribute iterStmtIn::IterStmt;
 synthesized attribute iterStmtOut::IterStmt;

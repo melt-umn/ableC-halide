@@ -1,4 +1,4 @@
-grammar edu:umn:cs:melt:exts:ableC:halide:src:concretesyntax;
+grammar edu:umn:cs:melt:exts:ableC:halide:concretesyntax;
 
 terminal Split_t       'split'       lexer classes {Ckeyword};
 terminal Reorder_t     'reorder'     lexer classes {Ckeyword};

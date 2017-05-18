@@ -1,4 +1,4 @@
-grammar edu:umn:cs:melt:exts:ableC:halide:src:concretesyntax;
+grammar edu:umn:cs:melt:exts:ableC:halide:concretesyntax;
 
 imports edu:umn:cs:melt:ableC:concretesyntax;
 imports silver:langutil only ast;
@@ -7,7 +7,7 @@ imports edu:umn:cs:melt:ableC:abstractsyntax;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
 imports edu:umn:cs:melt:ableC:abstractsyntax:env;
 
-imports edu:umn:cs:melt:exts:ableC:halide:src:abstractsyntax;
+imports edu:umn:cs:melt:exts:ableC:halide:abstractsyntax;
 
 marking terminal Transform_t 'transform' lexer classes {Ckeyword};
 

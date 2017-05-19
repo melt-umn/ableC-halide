@@ -52,6 +52,8 @@ top::Transformation ::= n::Name iv::IterVar ivs::IterVars
 abstract production anonSplitTransformation
 top::Transformation ::= n::Name ivs::IterVars
 {
+  top.pp = pp"split ${n.pp} into (_, ${ivs.pp});";
+
   local iterStmt::IterStmt = top.iterStmtIn;
   iterStmt.env = top.env;
   iterStmt.returnType = top.returnType;

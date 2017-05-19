@@ -136,6 +136,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
               location=builtin)),
           body.hostTrans)));
   
+  bty.givenRefId = nothing();
   body.env = addEnv(d.defs, openScope(top.env));
 }
 
@@ -189,6 +190,8 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
         txtStmt(s"for (${show(80, bty.pp)} ${show(80, head(d.pps))} = 0; ${n.name} < ${show(80, cutoff.pp)}; ${n.name}++)"),
         body.hostTrans]));
   
+  bty.givenRefId = nothing();
+  
   body.env = addEnv(d.defs, openScope(top.env));
 }
 
@@ -225,6 +228,8 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
         txtStmt(s"for (${show(80, bty.pp)} ${show(80, head(d.pps))} = 0; ${n.name} < ${show(80, cutoff.pp)}; ${n.name}++)"),
         body.hostTrans]));
   
+  bty.givenRefId = nothing();
+  
   body.env = addEnv(d.defs, openScope(top.env));
 }
 
@@ -253,6 +258,8 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
   
   top.forIterStmtTrans = forIterStmt(bty, mty, n, cutoff, rest.forIterStmtTrans);
   rest.forIterStmtBody = top.forIterStmtBody;
+  
+  bty.givenRefId = nothing();
 }
 
 abstract production consAnonIterVar
@@ -289,4 +296,6 @@ top::IterVar ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name
   top.errors := bty.errors ++ mty.errors;
   top.iterVarName = n;
   top.forIterStmtTrans = forIterStmt(bty, mty, n, top.forIterStmtCutoff, top.forIterStmtBody);
+  
+  bty.givenRefId = nothing();
 }

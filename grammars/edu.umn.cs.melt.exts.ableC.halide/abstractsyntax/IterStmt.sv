@@ -14,14 +14,7 @@ top::Stmt ::= is::IterStmt t::Transformation
 {
   top.pp =
     ppConcat([pp"transform ", braces(nestlines(2, is.pp)), pp" by ", braces(nestlines(2, t.pp))]);
-  top.errors :=
-    {-if !null(is.errors) -- iterStmtIn.errors get checked by every transformation that decorates iterStmtIn
-    then is.errors
-    else -}if !null(t.errors)
-    then t.errors
-    else if !null(transResult.errors)
-    then transResult.errors
-    else forward.errors;
+  top.functiondefs := []; -- TODO: Hack to avoid cyclic dependancy on env when forwarding
   
   t.iterStmtIn = is;
   
@@ -29,7 +22,14 @@ top::Stmt ::= is::IterStmt t::Transformation
   transResult.env = top.env;
   transResult.returnType = top.returnType;
   
-  forwards to transResult.hostTrans;
+  forwards to
+    {-if !null(is.errors) -- iterStmtIn.errors get checked by every transformation that decorates iterStmtIn
+    then warnStmt(is.errors)
+    else -}if !null(t.errors)
+    then warnStmt(t.errors)
+    else if !null(transResult.errors)
+    then warnStmt(transResult.errors)
+    else transResult.hostTrans;
 }
 
 synthesized attribute iterDefs::[Def];

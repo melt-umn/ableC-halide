@@ -6,7 +6,7 @@ ABLEC_JAR=ableC.jar
 # The artifact specification grammar to compile
 ARTIFACT=artifact
 # All directories containing grammars that may be included
-GRAMMAR_DIRS=$(wildcard $(EXT_HOME)/extensions/*/grammars) $(EXT_HOME)/ableC
+GRAMMAR_DIRS=$(ARTIFACT) $(wildcard $(EXT_HOME)/extensions/*/grammars) $(EXT_HOME)/ableC
 # All silver files in included grammars, to be included as dependancies
 GRAMMAR_SOURCES=$(shell find $(GRAMMAR_DIRS) -name *.sv -print0 | xargs -0)
 # Flags passed to silver including the appropriate directories
@@ -23,11 +23,20 @@ EXECUTABLES=$(XC_FILES:.xc=.out)
 # All evaluation marker files that should be generated
 TESTS=$(XC_FILES:.xc=.test)
 
+# All directories contining extension header files that may be included
 XC_INCLUDE_DIRS=$(wildcard $(EXT_HOME)/extensions/*/include)
+# Flags passed to ableC including the appropriate directories
 XCFLAGS=$(addprefix -I, $(XC_INCLUDE_PATH))
 
+# Flags passed to the C compiler, e.g. to enable various compiler extensions
+CFLAGS=-fopenmp
+
+# All directories contining extension libraries that may be linked
 LIB_DIRS=$(wildcard $(EXT_HOME)/extensions/*/lib)
-LDLIBS=$(addprefix -L, $(LIB_DIRS))
+# Flags passed to the linker specifying the appropriate directories
+LDFLAGS=$(addprefix -L, $(LIB_DIRS))
+# Flags passed to the linker specifying libraries to link
+LDLIBS=-lgomp
 
 all: $(ABLEC_JAR) $(C_FILES) $(OBJECTS) $(EXECUTABLES) $(TESTS)
 

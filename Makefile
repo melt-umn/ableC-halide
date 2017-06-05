@@ -25,3 +25,4 @@ clean:
 	@cd test && make clean
 
 .PHONY: all examples analyses mda mwda test clean
+.NOTPARALLEL: # Avoid running multiple Silver builds in parallel

@@ -34,14 +34,14 @@ XC_INCLUDE_DIRS=$(wildcard $(EXTS_BASE)/*/include)
 XCFLAGS=$(addprefix -I,$(XC_INCLUDE_DIRS))
 
 # Flags passed to the C compiler, e.g. to enable various compiler extensions
-CFLAGS=
+CFLAGS=-fopenmp
 
 # All directories contining extension libraries that may be linked
 LIB_DIRS=$(wildcard $(EXTS_BASE)/*/lib)
 # Flags passed to the linker specifying the appropriate directories
 LDFLAGS=$(addprefix -L,$(LIB_DIRS))
 # Flags passed to the linker specifying libraries to link
-LDLIBS=
+LDLIBS=-lgomp
 
 # All directories contining extension library sources
 SRC_DIRS=$(wildcard $(EXTS_BASE)/*/src)

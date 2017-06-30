@@ -3,11 +3,12 @@ grammar edu:umn:cs:melt:exts:ableC:halide:abstractsyntax;
 inherited attribute iterStmtIn::IterStmt;
 synthesized attribute iterStmtOut::IterStmt;
 
-nonterminal Transformation with location, pp, errors, iterStmtIn, iterStmtOut, env, returnType;
+nonterminal Transformation with location, substituted<Transformation>, pp, errors, iterStmtIn, iterStmtOut, substitutions, env, returnType;
 
 abstract production nullTransformation
 top::Transformation ::= 
 {
+  propagate substituted;
   top.pp = notext();
   top.errors := [];
   top.iterStmtOut = top.iterStmtIn;
@@ -16,6 +17,7 @@ top::Transformation ::=
 abstract production seqTransformation
 top::Transformation ::= h::Transformation t::Transformation
 {
+  propagate substituted;
   top.pp = ppConcat([h.pp, line(), t.pp]);
   top.errors := if !null(h.errors) then h.errors else t.errors;
   
@@ -27,6 +29,7 @@ top::Transformation ::= h::Transformation t::Transformation
 abstract production splitTransformation
 top::Transformation ::= n::Name iv::IterVar ivs::IterVars
 {
+  propagate substituted;
   top.pp = pp"split ${n.pp} into (${iv.pp}, ${ivs.pp});";
   top.errors := iv.errors ++ ivs.errors;
   
@@ -52,6 +55,7 @@ top::Transformation ::= n::Name iv::IterVar ivs::IterVars
 abstract production anonSplitTransformation
 top::Transformation ::= n::Name ivs::IterVars
 {
+  propagate substituted;
   top.pp = pp"split ${n.pp} into (_, ${ivs.pp});";
 
   local iterStmt::IterStmt = top.iterStmtIn;
@@ -74,6 +78,7 @@ top::Transformation ::= n::Name ivs::IterVars
 abstract production reorderTransformation
 top::Transformation ::= ns::Names
 {
+  propagate substituted;
   top.pp = pp"reorder ${ppImplode(pp", ", ns.pps)};";
   top.errors :=
      if !null(iterStmt.errors)
@@ -95,6 +100,7 @@ top::Transformation ::= ns::Names
 abstract production tileTransformation
 top::Transformation ::= ns::Names sizes::[Integer]
 {
+  propagate substituted;
   top.pp =
     cat(
       pp"tile ${ppImplode(pp", ", ns.pps)} ",
@@ -131,6 +137,7 @@ top::Transformation ::= ns::Names sizes::[Integer]
 abstract production unrollTransformation
 top::Transformation ::= n::Name
 {
+  propagate substituted;
   top.pp = pp"unroll ${n.pp};";
   top.errors :=
      if !null(iterStmt.errors)
@@ -152,6 +159,7 @@ top::Transformation ::= n::Name
 abstract production parallelizeTransformation
 top::Transformation ::= n::Name numThreads::Maybe<Integer>
 {
+  propagate substituted;
   local numThreadsPP::Document =
     case numThreads of
       just(n) -> pp" into (${text(toString(n))}) threads"
@@ -181,6 +189,7 @@ top::Transformation ::= n::Name numThreads::Maybe<Integer>
 abstract production vectorizeTransformation
 top::Transformation ::= n::Name
 {
+  propagate substituted;
   top.pp = pp"vectorize ${n.pp};";
   top.errors :=
      if !null(iterStmt.errors)
@@ -204,11 +213,12 @@ top::Transformation ::= n::Name
 synthesized attribute names::[String];
 synthesized attribute loopLookupChecks :: [Message];
 
-nonterminal Names with pps, names, count, loopLookupChecks, env;
+nonterminal Names with pps, substituted<Names>, names, count, loopLookupChecks, substitutions, env;
 
 abstract production consName
 top::Names ::= h::Name t::Names
 {
+  propagate substituted;
   top.pps = h.pp :: t.pps;
   top.names = h.name :: t.names;
   top.count = t.count + 1;
@@ -221,6 +231,7 @@ top::Names ::= h::Name t::Names
 abstract production nilName
 top::Names ::= 
 {
+  propagate substituted;
   top.pps = [];
   top.names = [];
   top.count = 0;

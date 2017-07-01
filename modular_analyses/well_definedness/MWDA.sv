@@ -5,6 +5,5 @@ grammar well_definedness;
    well-definedness analysis.
  -}
 
-import edu:umn:cs:melt:ableC:concretesyntax as cst;
-import edu:umn:cs:melt:ableC:drivers:parseAndPrint;
+import edu:umn:cs:melt:ableC:host;
 import edu:umn:cs:melt:exts:ableC:halide;

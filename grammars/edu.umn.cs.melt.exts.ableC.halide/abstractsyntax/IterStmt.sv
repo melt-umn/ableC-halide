@@ -272,6 +272,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
   rest.forIterStmtBody = top.forIterStmtBody;
   
   bty.givenRefId = nothing();
+  mty.baseType = bty.typerep;
 }
 
 abstract production consAnonIterVar
@@ -313,4 +314,5 @@ top::IterVar ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name
   top.forIterStmtTrans = forIterStmt(bty, mty, n, top.forIterStmtCutoff, top.forIterStmtBody);
   
   bty.givenRefId = nothing();
+  mty.baseType = bty.typerep;
 }

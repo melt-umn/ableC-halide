@@ -109,6 +109,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openScope(top.env);
   d.baseType = bty.typerep;
+  d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
   d.isTypedef = false;
   d.givenAttributes = nilAttribute();
@@ -171,6 +172,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openScope(top.env);
   d.baseType = bty.typerep;
+  d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
   d.isTypedef = false;
   d.givenAttributes = nilAttribute();
@@ -213,6 +215,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openScope(top.env);
   d.baseType = bty.typerep;
+  d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
   d.isTypedef = false;
   d.givenAttributes = nilAttribute();
@@ -270,6 +273,9 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
   rest.forIterStmtBody = top.forIterStmtBody;
   
   bty.givenRefId = nothing();
+  
+  mty.baseType = bty.typerep;
+  mty.typeModifiersIn = bty.typeModifiers;
 }
 
 abstract production consAnonIterVar
@@ -311,4 +317,7 @@ top::IterVar ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name
   top.forIterStmtTrans = forIterStmt(bty, mty, n, top.forIterStmtCutoff, top.forIterStmtBody);
   
   bty.givenRefId = nothing();
+  
+  mty.baseType = bty.typerep;
+  mty.typeModifiersIn = bty.typeModifiers;
 }

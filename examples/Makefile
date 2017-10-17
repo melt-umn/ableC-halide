@@ -30,6 +30,8 @@ TESTS=$(XC_FILES:.xc=.test)
 XC_INCLUDE_DIRS=$(wildcard $(EXTS_BASE)/*/include)
 # Flags passed to ableC including the appropriate directories
 override XCFLAGS+=$(addprefix -I,$(XC_INCLUDE_DIRS))
+# Flags passed to Java when invoking ableC
+override JAVAFLAGS+=-Xss6M
 
 # Flags passed to the C compiler, e.g. to enable various compiler extensions
 override CFLAGS+=-fopenmp
@@ -37,9 +39,9 @@ override CFLAGS+=-fopenmp
 # All directories contining extension libraries that may be linked
 LIB_DIRS=$(wildcard $(EXTS_BASE)/*/lib)
 # Flags passed to the linker specifying the appropriate directories
-LDFLAGS=$(addprefix -L,$(LIB_DIRS))
+override LDFLAGS=$(addprefix -L,$(LIB_DIRS))
 # Flags passed to the linker specifying libraries to link
-override LDLIBS+=-lgomp
+LDLIBS=-lgomp
 
 # All directories contining extension library sources
 SRC_DIRS=$(wildcard $(EXTS_BASE)/*/src)
@@ -60,7 +62,7 @@ $(ABLEC_JAR): $(GRAMMAR_SOURCES)
 	silver -o $@ $(SVFLAGS) $(ARTIFACT)
 
 %.c: %.xc $(ABLEC_JAR)
-	java -Xss6M -jar $(ABLEC_JAR) $< $(XCFLAGS)
+	java $(JAVAFLAGS) -jar $(ABLEC_JAR) $< $(XCFLAGS)
 
 %.out: %.o $(SRC_SOURCES) | libs
 	$(CC) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -o $@

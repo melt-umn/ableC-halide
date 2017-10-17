@@ -3,7 +3,7 @@ grammar edu:umn:cs:melt:exts:ableC:halide:abstractsyntax;
 imports silver:langutil;
 imports silver:langutil:pp;
 
-imports edu:umn:cs:melt:ableC:abstractsyntax;
+imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
 imports edu:umn:cs:melt:ableC:abstractsyntax:substitution;
 imports edu:umn:cs:melt:ableC:abstractsyntax:env;
@@ -126,15 +126,13 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
             consDeclarator(d, nilDeclarator()))),
         forStmt(
           justExpr(
-            binaryOpExpr(
+            eqExpr(
               declRefExpr(n, location=builtin),
-              assignOp(eqOp(location=builtin), location=builtin),
               mkIntConst(0, builtin),
               location=builtin)),
           justExpr(
-            binaryOpExpr(
+            ltExpr(
               declRefExpr(n, location=builtin),
-              compareOp(ltOp(location=builtin), location=builtin),
               cutoff,
               location=builtin)),
           justExpr(

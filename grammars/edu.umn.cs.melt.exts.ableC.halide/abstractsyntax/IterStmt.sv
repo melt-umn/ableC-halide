@@ -137,8 +137,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
               cutoff,
               location=builtin)),
           justExpr(
-            unaryOpExpr(
-              postIncOp(location=builtin),
+            postIncExpr(
               declRefExpr(n, location=builtin),
               location=builtin)),
           body.hostTrans)));

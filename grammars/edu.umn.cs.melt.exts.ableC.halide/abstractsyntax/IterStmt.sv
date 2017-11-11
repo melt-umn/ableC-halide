@@ -16,7 +16,7 @@ top::Stmt ::= is::IterStmt t::Transformation
   propagate substituted;
   top.pp =
     ppConcat([pp"transform ", braces(nestlines(2, is.pp)), pp" by ", braces(nestlines(2, t.pp))]);
-  top.functiondefs := []; -- TODO: Hack to avoid cyclic dependancy on env when forwarding
+  top.labelDefs := [];
   
   t.iterStmtIn = is;
   
@@ -73,7 +73,7 @@ top::IterStmt ::= is::IterStmt
   top.iterDefs = is.iterDefs;
   top.hostTrans = compoundStmt(is.hostTrans);
   
-  is.env = openScope(top.env);
+  is.env = openEnvScope(top.env);
 }
 
 abstract production stmtIterStmt
@@ -107,7 +107,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
-  d.env = openScope(top.env);
+  d.env = openEnvScope(top.env);
   d.baseType = bty.typerep;
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
@@ -143,7 +143,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
           body.hostTrans)));
   
   bty.givenRefId = nothing();
-  body.env = addEnv(d.defs, openScope(top.env));
+  body.env = addEnv(d.defs, openEnvScope(top.env));
 }
 
 abstract production multiForIterStmt
@@ -169,7 +169,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
-  d.env = openScope(top.env);
+  d.env = openEnvScope(top.env);
   d.baseType = bty.typerep;
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
@@ -201,7 +201,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   
   bty.givenRefId = nothing();
   
-  body.env = addEnv(d.defs, openScope(top.env));
+  body.env = addEnv(d.defs, openEnvScope(top.env));
 }
 
 abstract production vectorForIterStmt
@@ -212,7 +212,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
-  d.env = openScope(top.env);
+  d.env = openEnvScope(top.env);
   d.baseType = bty.typerep;
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
@@ -241,7 +241,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   
   bty.givenRefId = nothing();
   
-  body.env = addEnv(d.defs, openScope(top.env));
+  body.env = addEnv(d.defs, openEnvScope(top.env));
 }
 
 synthesized attribute iterVarNames::[Name];

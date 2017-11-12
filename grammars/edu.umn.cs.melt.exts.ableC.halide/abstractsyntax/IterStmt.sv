@@ -22,6 +22,7 @@ top::Stmt ::= is::IterStmt t::Transformation
   
   local transResult::IterStmt = t.iterStmtOut;
   transResult.env = top.env;
+  transResult.labelEnv = top.labelEnv;
   transResult.returnType = top.returnType;
   
   forwards to
@@ -37,7 +38,7 @@ top::Stmt ::= is::IterStmt t::Transformation
 synthesized attribute iterDefs::[Def];
 synthesized attribute hostTrans::Stmt;
 
-nonterminal IterStmt with pp, substituted<IterStmt>, errors, defs, iterDefs, hostTrans, substitutions, env, returnType;
+nonterminal IterStmt with pp, substituted<IterStmt>, errors, defs, iterDefs, hostTrans, substitutions, env, labelEnv, returnType;
 
 abstract production nullIterStmt
 top::IterStmt ::= 
@@ -108,6 +109,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openEnvScope(top.env);
+  d.labelEnv = openScope(top.labelEnv);
   d.baseType = bty.typerep;
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
@@ -170,6 +172,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openEnvScope(top.env);
+  d.labelEnv = openScope(top.labelEnv);
   d.baseType = bty.typerep;
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
@@ -213,6 +216,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openEnvScope(top.env);
+  d.labelEnv = openScope(top.labelEnv);
   d.baseType = bty.typerep;
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
@@ -249,7 +253,7 @@ synthesized attribute iterVarNames::[Name];
 synthesized attribute forIterStmtTrans::IterStmt;
 inherited attribute forIterStmtBody::IterStmt;
 
-nonterminal IterVars with pp, substituted<IterVars>, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, substitutions, env, returnType;
+nonterminal IterVars with pp, substituted<IterVars>, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, substitutions, env, labelEnv, returnType;
 
 abstract production consIterVar
 top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr rest::IterVars
@@ -304,7 +308,7 @@ synthesized attribute iterVarName::Name;
 
 inherited attribute forIterStmtCutoff::Expr;
 
-nonterminal IterVar with pp, substituted<IterVar>, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff, forIterStmtBody, substitutions, env, returnType;
+nonterminal IterVar with pp, substituted<IterVar>, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff, forIterStmtBody, substitutions, env, labelEnv, returnType;
 
 abstract production iterVar
 top::IterVar ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name

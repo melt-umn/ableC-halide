@@ -73,7 +73,7 @@ top::IterStmt ::= is::IterStmt
   top.iterDefs = is.iterDefs;
   top.hostTrans = compoundStmt(is.hostTrans);
   
-  is.env = openEnvScope(top.env);
+  is.env = openScopeEnv(top.env);
 }
 
 abstract production stmtIterStmt
@@ -107,7 +107,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
-  d.env = openEnvScope(top.env);
+  d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
@@ -143,7 +143,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
           body.hostTrans)));
   
   bty.givenRefId = nothing();
-  body.env = addEnv(d.defs, openEnvScope(top.env));
+  body.env = addEnv(d.defs, openScopeEnv(top.env));
 }
 
 abstract production multiForIterStmt
@@ -169,7 +169,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
-  d.env = openEnvScope(top.env);
+  d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
@@ -201,7 +201,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   
   bty.givenRefId = nothing();
   
-  body.env = addEnv(d.defs, openEnvScope(top.env));
+  body.env = addEnv(d.defs, openScopeEnv(top.env));
 }
 
 abstract production vectorForIterStmt
@@ -212,7 +212,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
-  d.env = openEnvScope(top.env);
+  d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
@@ -241,7 +241,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   
   bty.givenRefId = nothing();
   
-  body.env = addEnv(d.defs, openEnvScope(top.env));
+  body.env = addEnv(d.defs, openScopeEnv(top.env));
 }
 
 synthesized attribute iterVarNames::[Name];

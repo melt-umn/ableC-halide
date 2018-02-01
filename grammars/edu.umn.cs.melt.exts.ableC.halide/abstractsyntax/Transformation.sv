@@ -401,18 +401,16 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
   top.splitIndexTrans = rest.splitIndexTrans;
   rest.splitIndexTransIn =
     mkAdd(
-      binaryOpExpr(
+      mulExpr(
         top.splitIndexTransIn,
-        numOp(mulOp(location=builtin), location=builtin),
         cutoff,
         location=builtin),
       declRefExpr(n, location=builtin),
       builtin);
   
   top.outerCutoffTrans = 
-    binaryOpExpr(
+    mulExpr(
       cutoff,
-      numOp(mulOp(location=builtin), location=builtin),
       rest.outerCutoffTrans,
       location=builtin);
   
@@ -457,9 +455,8 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
                     justInitializer(exprInitializer(splitIterVars.splitIndexTrans))), 
                     nilDeclarator())))),
           condIterStmt(
-            binaryOpExpr(
+            ltExpr(
               declRefExpr(n, location=builtin),
-              compareOp(ltOp(location=builtin), location=builtin),
               cutoff,
               location=builtin),
             innerBody,
@@ -478,13 +475,11 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   local forIterStmtCutoff::Expr = -- Calculate ceil(cutoff/product of split indices)
     mkAdd(
       mkIntConst(1, builtin),
-      binaryOpExpr(
-        binaryOpExpr(
+      divExpr(
+        subExpr(
           cutoff,
-          numOp(subOp(location=builtin), location=builtin),
           mkIntConst(1, builtin),
           location=builtin),
-        numOp(divOp(location=builtin), location=builtin),
         splitIterVars.outerCutoffTrans,
         location=builtin),
       builtin);

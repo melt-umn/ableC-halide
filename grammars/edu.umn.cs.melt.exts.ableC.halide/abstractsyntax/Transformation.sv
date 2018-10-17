@@ -210,31 +210,20 @@ top::Transformation ::= n::Name
   top.iterStmtOut = iterStmt.vectorizeTrans;
 }
 
-synthesized attribute names::[String];
-synthesized attribute loopLookupChecks :: [Message];
+synthesized attribute loopLookupChecks::[Message] occurs on Names;
 
-nonterminal Names with pps, substituted<Names>, names, count, loopLookupChecks, substitutions, env;
-
-abstract production consName
+aspect production consName
 top::Names ::= h::Name t::Names
 {
-  propagate substituted;
-  top.pps = h.pp :: t.pps;
-  top.names = h.name :: t.names;
-  top.count = t.count + 1;
   top.loopLookupChecks =
     (if !null(h.valueLookupCheck)
      then [err(h.location, h.name ++ " is not a transformable loop")]
      else []) ++ t.loopLookupChecks;
 }
 
-abstract production nilName
+aspect production nilName
 top::Names ::= 
 {
-  propagate substituted;
-  top.pps = [];
-  top.names = [];
-  top.count = 0;
   top.loopLookupChecks = [];
 }
 

@@ -112,6 +112,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
   d.isTypedef = false;
+  d.givenStorageClasses = [];
   d.givenAttributes = nilAttribute();
   d.returnType = top.returnType;
   
@@ -174,6 +175,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
   d.isTypedef = false;
+  d.givenStorageClasses = [];
   d.givenAttributes = nilAttribute();
   d.returnType = top.returnType;
   
@@ -217,6 +219,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
   d.isTypedef = false;
+  d.givenStorageClasses = [];
   d.givenAttributes = nilAttribute();
   d.returnType = top.returnType;
   

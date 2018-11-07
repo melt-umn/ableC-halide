@@ -436,7 +436,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
           stmtIterStmt(
             declStmt( 
               variableDecls(
-                nilStorageClasses(), nilAttribute(),
+                nilStorageClass(), nilAttribute(),
                 directTypeExpr(d.typerep),
                 consDeclarator( 
                   declarator(
@@ -636,7 +636,7 @@ IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name body::IterStmt numI
         stmtIterStmt(
           declStmt( 
             variableDecls(
-              nilStorageClasses(), nilAttribute(),
+              nilStorageClass(), nilAttribute(),
               bty,
               consDeclarator(
                 declarator(

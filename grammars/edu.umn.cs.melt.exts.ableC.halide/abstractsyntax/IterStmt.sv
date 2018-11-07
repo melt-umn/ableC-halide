@@ -112,7 +112,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
   d.isTypedef = false;
-  d.givenStorageClasses = nilStorageClasses();
+  d.givenStorageClasses = nilStorageClass();
   d.givenAttributes = nilAttribute();
   d.returnType = top.returnType;
   
@@ -123,7 +123,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
       seqStmt(
         declStmt( 
           variableDecls(
-            nilStorageClasses(), nilAttribute(),
+            nilStorageClass(), nilAttribute(),
             bty,
             consDeclarator(d, nilDeclarator()))),
         forStmt(
@@ -175,7 +175,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
   d.isTypedef = false;
-  d.givenStorageClasses = nilStorageClasses();
+  d.givenStorageClasses = nilStorageClass();
   d.givenAttributes = nilAttribute();
   d.returnType = top.returnType;
   
@@ -191,7 +191,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
       foldStmt([
         declStmt( -- Still re-declare the loop variable in the ast, so it shows up in env for the host error check
           variableDecls(
-            nilStorageClasses(), nilAttribute(),
+            nilStorageClass(), nilAttribute(),
             bty,
             consDeclarator(d, nilDeclarator()))),
         case numThreads of
@@ -219,7 +219,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
   d.isTypedef = false;
-  d.givenStorageClasses = nilStorageClasses();
+  d.givenStorageClasses = nilStorageClass();
   d.givenAttributes = nilAttribute();
   d.returnType = top.returnType;
   
@@ -235,7 +235,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
       foldStmt([
         declStmt( -- Still re-declare the loop variable in the ast, so it shows up in env for the host error check
           variableDecls(
-            nilStorageClasses(), nilAttribute(),
+            nilStorageClass(), nilAttribute(),
             bty,
             consDeclarator(d, nilDeclarator()))),
         txtStmt("#pragma omp simd"),

@@ -425,15 +425,9 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
       compoundIterStmt(
         seqIterStmt(
           stmtIterStmt(
-            declStmt( 
-              variableDecls(
-                nilStorageClass(), nilAttribute(),
-                directTypeExpr(d.typerep),
-                consDeclarator( 
-                  declarator(
-                    n, baseTypeExpr(), nilAttribute(),
-                    justInitializer(exprInitializer(splitIterVars.splitIndexTrans))), 
-                    nilDeclarator())))),
+            ableC_Stmt {
+              $directTypeExpr{d.typerep} $Name{n} = $Expr{splitIterVars.splitIndexTrans};
+            }),
           condIterStmt(
             ltExpr(
               declRefExpr(n, location=builtin),
@@ -452,17 +446,11 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   
   local splitIterVar::IterVar = top.newIterVar;
   
-  local forIterStmtCutoff::Expr = -- Calculate ceil(cutoff/product of split indices)
-    mkAdd(
-      mkIntConst(1, builtin),
-      divExpr(
-        subExpr(
-          cutoff,
-          mkIntConst(1, builtin),
-          location=builtin),
-        splitIterVars.outerCutoffTrans,
-        location=builtin),
-      builtin);
+  local forIterStmtCutoff::Expr =
+    ableC_Expr {
+      // Calculate ceil(cutoff/product of split indices)
+      1 + ($Expr{cutoff} - 1) / $Expr{splitIterVars.outerCutoffTrans}
+    };
   splitIterVar.forIterStmtCutoff =
     case cutoff of
       realConstant(integerConstant(num, _, _)) -> 

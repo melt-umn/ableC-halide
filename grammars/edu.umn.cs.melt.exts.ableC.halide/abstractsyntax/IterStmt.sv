@@ -5,18 +5,19 @@ imports silver:langutil:pp;
 
 imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
+imports edu:umn:cs:melt:ableC:abstractsyntax:overloadable;
 imports edu:umn:cs:melt:ableC:abstractsyntax:env;
 
 global builtin::Location = builtinLoc("halide");
 
 abstract production iterateStmt
-top::Stmt ::= is::IterStmt t::Transformation
+top::Stmt ::= s::IterStmt t::Transformation
 {
   top.pp =
-    ppConcat([pp"transform ", braces(nestlines(2, is.pp)), pp" by ", braces(nestlines(2, t.pp))]);
+    ppConcat([pp"transform ", braces(nestlines(2, s.pp)), pp" by ", braces(nestlines(2, t.pp))]);
   top.functionDefs := [];
   
-  t.iterStmtIn = is;
+  t.iterStmtIn = s;
   
   local transResult::IterStmt = t.iterStmtOut;
   transResult.env = top.env;
@@ -111,29 +112,18 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   top.defs := [];
   top.iterDefs = valueDef(n.name, declaratorValueItem(d)) :: body.iterDefs;
   top.hostTrans =
-    compoundStmt(
-      seqStmt(
-        declStmt( 
+    ableC_Stmt {
+      {
+        $Decl{
           variableDecls(
             nilStorageClass(), nilAttribute(),
             bty,
-            consDeclarator(d, nilDeclarator()))),
-        forStmt(
-          justExpr(
-            eqExpr(
-              declRefExpr(n, location=builtin),
-              mkIntConst(0, builtin),
-              location=builtin)),
-          justExpr(
-            ltExpr(
-              declRefExpr(n, location=builtin),
-              cutoff,
-              location=builtin)),
-          justExpr(
-            postIncExpr(
-              declRefExpr(n, location=builtin),
-              location=builtin)),
-          body.hostTrans)));
+            consDeclarator(d, nilDeclarator()))}
+        for ($Name{n} = 0; $Name{n} < $Expr{cutoff}; $Name{n}++) {
+          $Stmt{body.hostTrans}
+        }
+      }
+    };
   
   bty.givenRefId = nothing();
   body.env = addEnv(d.defs, openScopeEnv(top.env));

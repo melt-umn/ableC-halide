@@ -87,12 +87,12 @@ int main(int argc, char **argv) {
   fprintf(stderr, "Checking results are equal... ");
   int error = 0;
   transform {
-    forall (unsigned i : M, unsigned j : N) {{
+    forall (unsigned i : M, unsigned j : N) {
       if (c[i][j] != c_ref[i][j]) {
         //printf("Error at element %d, %d: c = %f, c_ref = %f\n", i, j, c[i][j], c_ref[i][j]);
         error = 1;
       }
-    }}
+    }
   } by {
     parallelize i;
     vectorize j;

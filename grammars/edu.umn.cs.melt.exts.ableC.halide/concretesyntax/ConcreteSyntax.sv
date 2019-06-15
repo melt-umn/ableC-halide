@@ -14,5 +14,5 @@ marking terminal Transform_t 'transform' lexer classes {Ckeyword};
 terminal By_t 'by' lexer classes {Ckeyword};
 
 concrete productions top::IterationStmt_c
-| 'transform' '{' is::IterStmts_c '}' 'by' '{' ts::Transformations_c '}'
-  { top.ast = iterateStmt(is.ast, ts.ast); }
+| 'transform' '{' s::BlockItemList_c '}' 'by' '{' ts::Transformations_c '}'
+  { top.ast = transformStmt(foldStmt(s.ast), ts.ast); }

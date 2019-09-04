@@ -1,31 +1,10 @@
 grammar edu:umn:cs:melt:exts:ableC:halide:concretesyntax;
 
--- For double-brace-enclosed statments
--- We need to use the RCurly_t terminal from ableC to close the scope, to avoid issues with the mda
--- The lexer hack parser action for this closes two scopes, so we need to open two scopes to balance this
-terminal DoubleLBrace_t '{{'
-  action { context = head(context) :: head(context) :: context; },
-  lexer classes {Ckeyword};
+marking terminal MultiFor_t 'forall' lexer classes {Ckeyword};
 
-nonterminal IterStmts_c with ast<IterStmt>;
-
-concrete productions top::IterStmts_c
-| h::IterStmt_c t::IterStmts_c
-  { top.ast = seqIterStmt(h.ast, t.ast); }
-| 
-  { top.ast = nullIterStmt(); }
-
-nonterminal IterStmt_c with ast<IterStmt>;
-
-concrete productions top::IterStmt_c
-| '{' is::IterStmts_c '}'
-  { top.ast = compoundIterStmt(is.ast); }
-| '{{' l::BlockItemList_c '}' '}'
-  { top.ast = stmtIterStmt(foldStmt(l.ast)); }
-| e::Expr_c ';'
-  { top.ast = stmtIterStmt(exprStmt(e.ast)); }
-| 'for' '(' ivs::IterVars_c ')' body::IterStmt_c
-  { top.ast = multiForIterStmt(ivs.ast, body.ast); }
+concrete productions top::Stmt_c
+| 'forall' '(' ivs::IterVars_c ')' body::Stmt_c
+  { top.ast = multiForStmt(ivs.ast, body.ast); }
   
 nonterminal IterVars_c with ast<IterVars>;
 

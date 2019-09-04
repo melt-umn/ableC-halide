@@ -5,44 +5,105 @@ imports silver:langutil:pp;
 
 imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
-imports edu:umn:cs:melt:ableC:abstractsyntax:substitution;
+imports edu:umn:cs:melt:ableC:abstractsyntax:overloadable;
 imports edu:umn:cs:melt:ableC:abstractsyntax:env;
 
 global builtin::Location = builtinLoc("halide");
 
-abstract production iterateStmt
-top::Stmt ::= is::IterStmt t::Transformation
+abstract production transformStmt
+top::Stmt ::= s::Stmt t::Transformation
 {
-  propagate substituted;
   top.pp =
-    ppConcat([pp"transform ", braces(nestlines(2, is.pp)), pp" by ", braces(nestlines(2, t.pp))]);
+    ppConcat([pp"transform ", braces(nestlines(2, s.pp)), pp" by ", braces(nestlines(2, t.pp))]);
   top.functionDefs := [];
   
-  t.iterStmtIn = is;
+  t.iterStmtIn = stmtToIterStmt(s);
   
   local transResult::IterStmt = t.iterStmtOut;
   transResult.env = top.env;
   transResult.returnType = top.returnType;
   
   forwards to
-    {-if !null(is.errors) -- iterStmtIn.errors get checked by every transformation that decorates iterStmtIn
-    then warnStmt(is.errors)
-    else -}if !null(t.errors)
+    if !null(s.errors)
+    then warnStmt(s.errors)
+    else if !null(t.errors)
     then warnStmt(t.errors)
     else if !null(transResult.errors)
     then warnStmt(transResult.errors)
     else transResult.hostTrans;
 }
 
+function stmtToIterStmt
+IterStmt ::= s::Decorated Stmt
+{
+  return
+    case s of
+    | nullStmt() -> nullIterStmt()
+    | seqStmt(s1, s2) -> seqIterStmt(stmtToIterStmt(s1), stmtToIterStmt(s2))
+    | compoundStmt(s1) -> stmtToIterStmt(s1)
+    | ableC_Stmt { if ($Expr c) $Stmt t else $Stmt e } ->
+      condIterStmt(c, stmtToIterStmt(t), stmtToIterStmt(e))
+    | ableC_Stmt {
+        for ($BaseTypeExpr t $Name i1 = 0; $Name i2 < $Expr n; $Name i3++)
+          $Stmt b
+      } ->
+      checkLoopVars(
+        i1, i2, i3,
+        forIterStmt(t, baseTypeExpr(), i1, n, stmtToIterStmt(b)))
+    | ableC_Stmt {
+        for ($BaseTypeExpr t $Name i1 = 0; $Name i2 <= $Expr n; $Name i3++)
+          $Stmt b
+      } ->
+      checkLoopVars(
+        i1, i2, i3,
+        forIterStmt(t, baseTypeExpr(), i1, ableC_Expr { $Expr{n} + 1 }, stmtToIterStmt(b)))
+    | ableC_Stmt {
+        for ($BaseTypeExpr t $Name i1 = 0; $Name i2 < $Expr n; $Name i3 += 1)
+          $Stmt b
+      } ->
+      checkLoopVars(
+        i1, i2, i3,
+        forIterStmt(t, baseTypeExpr(), i1, n, stmtToIterStmt(b)))
+    | ableC_Stmt {
+        for ($BaseTypeExpr t $Name i1 = 0; $Name i2 <= $Expr n; $Name i3 += 1)
+          $Stmt b
+      } ->
+      checkLoopVars(
+        i1, i2, i3,
+        forIterStmt(t, baseTypeExpr(), i1, ableC_Expr { $Expr{n} + 1 }, stmtToIterStmt(b)))
+    | s -> stmtIterStmt(new(s))
+    end;
+}
+
+function checkLoopVars
+IterStmt ::= i1::Name i2::Name i3::Name s::IterStmt
+{
+  return
+    if i1.name != i2.name
+    then stmtIterStmt(warnStmt([err(i2.location, s"Loop variables must match: ${i1.name}, ${i2.name}")]))
+    else if i1.name != i3.name
+    then stmtIterStmt(warnStmt([err(i3.location, s"Loop variables must match: ${i1.name}, ${i3.name}")]))
+    else s; 
+}
+
+abstract production multiForStmt
+top::Stmt ::= ivs::IterVars body::Stmt
+{
+  top.pp = pp"forall (${ivs.pp}) ${braces(nestlines(2, body.pp))}";
+  top.functionDefs := [];
+  
+  ivs.forIterStmtBody = stmtIterStmt(body);
+  forwards to ivs.forIterStmtTrans.hostTrans;
+}
+
 synthesized attribute iterDefs::[Def];
 synthesized attribute hostTrans::Stmt;
 
-nonterminal IterStmt with pp, substituted<IterStmt>, errors, defs, iterDefs, hostTrans, substitutions, env, returnType;
+nonterminal IterStmt with pp, errors, defs, iterDefs, hostTrans, env, returnType;
 
 abstract production nullIterStmt
 top::IterStmt ::= 
 {
-  propagate substituted;
   top.pp = notext();
   top.errors := [];
   top.defs := [];
@@ -53,7 +114,6 @@ top::IterStmt ::=
 abstract production seqIterStmt
 top::IterStmt ::= h::IterStmt t::IterStmt
 {
-  propagate substituted;
   top.pp = ppConcat([ h.pp, line(), t.pp ]);
   top.errors := h.errors ++ t.errors;
   top.defs := h.defs ++ t.defs;
@@ -66,7 +126,6 @@ top::IterStmt ::= h::IterStmt t::IterStmt
 abstract production compoundIterStmt
 top::IterStmt ::= is::IterStmt
 {
-  propagate substituted;
   top.pp = braces(nestlines(2, is.pp));
   top.errors := is.errors;
   top.defs := [];
@@ -79,7 +138,6 @@ top::IterStmt ::= is::IterStmt
 abstract production stmtIterStmt
 top::IterStmt ::= s::Stmt
 {
-  propagate substituted;
   top.pp = braces(braces(nestlines(2, s.pp)));
   top.errors := s.errors;
   top.defs := s.defs;
@@ -90,7 +148,6 @@ top::IterStmt ::= s::Stmt
 abstract production condIterStmt
 top::IterStmt ::= cond::Expr th::IterStmt el::IterStmt
 {
-  propagate substituted;
   top.pp = pp"if (${cond.pp})${nestlines(2, th.pp)} else ${nestlines(2, el.pp)}";
   top.errors := cond.errors ++ th.errors ++ el.errors;
   
@@ -102,64 +159,41 @@ top::IterStmt ::= cond::Expr th::IterStmt el::IterStmt
 abstract production forIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
-  propagate substituted;
   top.pp = pp"for (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
-  production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
+  production d::Declarator =
+    declarator(
+      n, mty, nilAttribute(),
+      justInitializer(exprInitializer(ableC_Expr {0})));
   d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
   d.isTypedef = false;
+  d.givenStorageClasses = nilStorageClass();
   d.givenAttributes = nilAttribute();
   d.returnType = top.returnType;
   
   top.defs := [];
   top.iterDefs = valueDef(n.name, declaratorValueItem(d)) :: body.iterDefs;
   top.hostTrans =
-    compoundStmt(
-      seqStmt(
-        declStmt( 
-          variableDecls(
-            [], nilAttribute(),
-            bty,
-            consDeclarator(d, nilDeclarator()))),
-        forStmt(
-          justExpr(
-            eqExpr(
-              declRefExpr(n, location=builtin),
-              mkIntConst(0, builtin),
-              location=builtin)),
-          justExpr(
-            ltExpr(
-              declRefExpr(n, location=builtin),
-              cutoff,
-              location=builtin)),
-          justExpr(
-            postIncExpr(
-              declRefExpr(n, location=builtin),
-              location=builtin)),
-          body.hostTrans)));
+    ableC_Stmt {
+      for ($Decl{
+        variableDecls(
+          nilStorageClass(), nilAttribute(),
+          bty,
+          consDeclarator(d, nilDeclarator()))} $Name{n} < $Expr{cutoff}; $Name{n}++)
+        $Stmt{body.hostTrans}
+    };
   
   bty.givenRefId = nothing();
   body.env = addEnv(d.defs, openScopeEnv(top.env));
 }
 
-abstract production multiForIterStmt
-top::IterStmt ::= ivs::IterVars body::IterStmt
-{
-  propagate substituted;
-  top.pp = pp"for (${ivs.pp}) ${braces(nestlines(2, body.pp))}";
-  
-  ivs.forIterStmtBody = body;
-  forwards to ivs.forIterStmtTrans;
-}
-
 abstract production parallelForIterStmt
 top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
-  propagate substituted;
   local numThreadsPP::Document =
     case numThreads of
       just(n) -> parens(text(toString(n)))
@@ -174,6 +208,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
   d.isTypedef = false;
+  d.givenStorageClasses = nilStorageClass();
   d.givenAttributes = nilAttribute();
   d.returnType = top.returnType;
   
@@ -189,7 +224,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
       foldStmt([
         declStmt( -- Still re-declare the loop variable in the ast, so it shows up in env for the host error check
           variableDecls(
-            [], nilAttribute(),
+            nilStorageClass(), nilAttribute(),
             bty,
             consDeclarator(d, nilDeclarator()))),
         case numThreads of
@@ -197,7 +232,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
         | nothing() -> txtStmt("#pragma omp parallel for")
         end,
         txtStmt(s"for (${show(80, bty.pp)} ${show(80, head(d.pps))} = 0; ${n.name} < ${show(80, cutoff.pp)}; ${n.name}++)"),
-        body.hostTrans]));
+        compoundStmt(body.hostTrans)]));
   
   bty.givenRefId = nothing();
   
@@ -207,7 +242,6 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
 abstract production vectorForIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
-  propagate substituted;
   top.pp = pp"for vector (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
   top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
   
@@ -217,6 +251,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   d.typeModifiersIn = bty.typeModifiers;
   d.isTopLevel = false;
   d.isTypedef = false;
+  d.givenStorageClasses = nilStorageClass();
   d.givenAttributes = nilAttribute();
   d.returnType = top.returnType;
   
@@ -232,12 +267,12 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
       foldStmt([
         declStmt( -- Still re-declare the loop variable in the ast, so it shows up in env for the host error check
           variableDecls(
-            [], nilAttribute(),
+            nilStorageClass(), nilAttribute(),
             bty,
             consDeclarator(d, nilDeclarator()))),
         txtStmt("#pragma omp simd"),
         txtStmt(s"for (${show(80, bty.pp)} ${show(80, head(d.pps))} = 0; ${n.name} < ${show(80, cutoff.pp)}; ${n.name}++)"),
-        body.hostTrans]));
+        compoundStmt(body.hostTrans)]));
   
   bty.givenRefId = nothing();
   
@@ -249,12 +284,11 @@ synthesized attribute iterVarNames::[Name];
 synthesized attribute forIterStmtTrans::IterStmt;
 inherited attribute forIterStmtBody::IterStmt;
 
-nonterminal IterVars with pp, substituted<IterVars>, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, substitutions, env, returnType;
+nonterminal IterVars with pp,errors, iterVarNames, forIterStmtTrans, forIterStmtBody, env, returnType;
 
 abstract production consIterVar
 top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr rest::IterVars
 {
-  propagate substituted;
   top.pp = ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp, text(" : "), cutoff.pp, comma(), space(), rest.pp]);
   top.errors :=
     bty.errors ++ mty.errors ++ cutoff.errors ++
@@ -280,7 +314,6 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
 abstract production consAnonIterVar
 top::IterVars ::= cutoff::Expr rest::IterVars
 {
-  propagate substituted;
   top.pp = ppConcat([cutoff.pp, comma(), rest.pp]);
   forwards to
     consIterVar(
@@ -293,7 +326,6 @@ top::IterVars ::= cutoff::Expr rest::IterVars
 abstract production nilIterVar
 top::IterVars ::= 
 {
-  propagate substituted;
   top.pp = notext();
   top.errors := [];
   top.iterVarNames = [];
@@ -304,12 +336,11 @@ synthesized attribute iterVarName::Name;
 
 inherited attribute forIterStmtCutoff::Expr;
 
-nonterminal IterVar with pp, substituted<IterVar>, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff, forIterStmtBody, substitutions, env, returnType;
+nonterminal IterVar with pp, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff, forIterStmtBody, env, returnType;
 
 abstract production iterVar
 top::IterVar ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name
 {
-  propagate substituted;
   top.pp = ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp]);
   top.errors := bty.errors ++ mty.errors;
   top.iterVarName = n;

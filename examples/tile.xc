@@ -4,7 +4,7 @@ int main (int argc, char **argv) {
   int result[10][10];
 
   transform {
-    for (unsigned x : 11 - 1, unsigned y : 10) {
+    forall (unsigned x : 11 - 1, unsigned y : 10) {
       result[x][y] = x + y;
     }
   } by {
@@ -14,14 +14,12 @@ int main (int argc, char **argv) {
     tile x, y into (4, 4);
   }
   
-  transform {
-    for (unsigned x : 10) {
-      for (unsigned y : 10) {
-        printf("%2d ", result[x][y]);
-      }
-      printf("\n");
+  forall (unsigned x : 10) {
+    forall (unsigned y : 10) {
+      printf("%2d ", result[x][y]);
     }
-  } by {}
+    printf("\n");
+  }
 
   return 0;
 }

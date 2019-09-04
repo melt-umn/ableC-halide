@@ -14,9 +14,9 @@
 void matmul(unsigned m, unsigned n, unsigned p,
             float a[m][p], float b[p][n], float c[m][n]) {
   transform {
-    for (unsigned i : m, unsigned j : n) {
+    forall (unsigned i : m, unsigned j : n) {
       c[i][j] = 0;
-      for (unsigned k : p) {
+      forall (unsigned k : p) {
         c[i][j] += a[i][k] * b[k][j];
       }
     }
@@ -36,9 +36,9 @@ void matmul(unsigned m, unsigned n, unsigned p,
 void matmul_gold(unsigned m, unsigned n, unsigned p,
                  float a[m][p], float b[p][n], float c[m][n]) {
   transform {
-    for (unsigned i : m, unsigned j : n) {
+    forall (unsigned i : m, unsigned j : n) {
       c[i][j] = 0;
-      for (unsigned k : p) {
+      forall (unsigned k : p) {
         c[i][j] += a[i][k] * b[k][j];
       }
     }
@@ -56,10 +56,10 @@ int main(int argc, char **argv) {
 
   fprintf(stderr, "Building input matrices...\n");
   transform {
-    for (unsigned k : P) {
-      for (unsigned i : M)
+    forall (unsigned k : P) {
+      forall (unsigned i : M)
         a[i][k] = (float)rand() / (float)RAND_MAX;
-      for (unsigned j : M)
+      forall (unsigned j : M)
         b[k][j] = (float)rand() / (float)RAND_MAX;
     }
   } by {
@@ -87,12 +87,12 @@ int main(int argc, char **argv) {
   fprintf(stderr, "Checking results are equal... ");
   int error = 0;
   transform {
-    for (unsigned i : M, unsigned j : N) {{
+    forall (unsigned i : M, unsigned j : N) {
       if (c[i][j] != c_ref[i][j]) {
         //printf("Error at element %d, %d: c = %f, c_ref = %f\n", i, j, c[i][j], c_ref[i][j]);
         error = 1;
       }
-    }}
+    }
   } by {
     parallelize i;
     vectorize j;

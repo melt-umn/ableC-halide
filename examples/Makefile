@@ -34,7 +34,7 @@ override XCFLAGS+=$(addprefix -I,$(XC_INCLUDE_DIRS))
 override JAVAFLAGS+=-Xss6M
 
 # Flags passed to the C compiler, e.g. to enable various compiler extensions
-override CFLAGS+=-fopenmp
+override CFLAGS+=-fopenmp -g
 
 # All directories contining extension libraries that may be linked
 LIB_DIRS=$(wildcard $(EXTS_BASE)/*/lib)
@@ -59,7 +59,7 @@ $(LIBS):
 
 $(ABLEC_JAR): $(GRAMMAR_SOURCES)
 	touch $(wildcard $(ARTIFACT)/*.sv)
-	silver -o $@ $(SVFLAGS) $(ARTIFACT)
+	silver-ableC -o $@ $(SVFLAGS) $(ARTIFACT)
 
 %.c: %.xc $(ABLEC_JAR)
 	java $(JAVAFLAGS) -jar $(ABLEC_JAR) $< $(XCFLAGS)

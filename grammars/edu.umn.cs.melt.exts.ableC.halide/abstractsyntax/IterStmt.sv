@@ -168,7 +168,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
       justInitializer(exprInitializer(ableC_Expr {0})));
   d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
-  d.typeModifiersIn = bty.typeModifiers;
+  d.typeModifierIn = bty.typeModifier;
   d.isTopLevel = false;
   d.isTypedef = false;
   d.givenStorageClasses = nilStorageClass();
@@ -205,7 +205,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
-  d.typeModifiersIn = bty.typeModifiers;
+  d.typeModifierIn = bty.typeModifier;
   d.isTopLevel = false;
   d.isTypedef = false;
   d.givenStorageClasses = nilStorageClass();
@@ -248,7 +248,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
-  d.typeModifiersIn = bty.typeModifiers;
+  d.typeModifierIn = bty.typeModifier;
   d.isTopLevel = false;
   d.isTypedef = false;
   d.givenStorageClasses = nilStorageClass();
@@ -308,7 +308,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
   bty.givenRefId = nothing();
   
   mty.baseType = bty.typerep;
-  mty.typeModifiersIn = bty.typeModifiers;
+  mty.typeModifierIn = bty.typeModifier;
 }
 
 abstract production consAnonIterVar
@@ -349,5 +349,5 @@ top::IterVar ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name
   bty.givenRefId = nothing();
   
   mty.baseType = bty.typerep;
-  mty.typeModifiersIn = bty.typeModifiers;
+  mty.typeModifierIn = bty.typeModifier;
 }

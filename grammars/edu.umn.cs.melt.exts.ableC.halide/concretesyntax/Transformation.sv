@@ -1,14 +1,14 @@
 grammar edu:umn:cs:melt:exts:ableC:halide:concretesyntax;
 
-terminal Split_t       'split'       lexer classes {Ckeyword};
-terminal Reorder_t     'reorder'     lexer classes {Ckeyword};
-terminal Tile_t        'tile'        lexer classes {Ckeyword};
-terminal Unroll_t      'unroll'      lexer classes {Ckeyword};
-terminal Parallelize_t 'parallelize' lexer classes {Ckeyword};
-terminal Vectorize_t   'vectorize'   lexer classes {Ckeyword};
+terminal Split_t       'split'       lexer classes {Keyword};
+terminal Reorder_t     'reorder'     lexer classes {Keyword};
+terminal Tile_t        'tile'        lexer classes {Keyword};
+terminal Unroll_t      'unroll'      lexer classes {Keyword};
+terminal Parallelize_t 'parallelize' lexer classes {Keyword};
+terminal Vectorize_t   'vectorize'   lexer classes {Keyword};
 
-terminal Into_t        'into'        lexer classes {Ckeyword};
-terminal Threads_t     'threads'     lexer classes {Ckeyword};
+terminal Into_t        'into'        lexer classes {Keyword, Global};
+terminal Threads_t     'threads'     lexer classes {Keyword};
 
 closed nonterminal Transformations_c with location, ast<Transformation>;
 

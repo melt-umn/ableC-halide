@@ -294,7 +294,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
     bty.errors ++ mty.errors ++ cutoff.errors ++
     case cutoff.integerConstantValue of
     | just(n) when n < 1 -> [err(cutoff.location, "Split loop size must be >= 1")]
-    | nothing() -> []
+    | _ -> []
     end ++
     rest.errors;
   top.iterVarNames = n :: rest.iterVarNames;

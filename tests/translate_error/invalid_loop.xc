@@ -9,16 +9,7 @@ int main (int argc, char **argv) {
       }
     }
   } by {
-    split x into (unsigned x_outer, unsigned x_inner : 3);
-  }
-  
-  forall (unsigned x : 10) {
-    forall (unsigned y : 10) {
-      printf("%2d ", result[x][y]);
-      if (result[x][y] != x + y)
-        return 1;
-    }
-    printf("\n");
+    split y into (unsigned y_outer, unsigned y_inner : 3);
   }
 
   return 0;

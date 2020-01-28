@@ -2,6 +2,7 @@ grammar edu:umn:cs:melt:exts:ableC:halide:abstractsyntax;
 
 imports silver:langutil;
 imports silver:langutil:pp;
+imports silver:rewrite as s;
 
 imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
@@ -17,7 +18,11 @@ top::Stmt ::= s::Stmt t::Transformation
     ppConcat([pp"transform ", braces(nestlines(2, s.pp)), pp" by ", braces(nestlines(2, t.pp))]);
   top.functionDefs := [];
   
-  t.iterStmtIn = stmtToIterStmt(s);
+  local normalizedS::Stmt = rewriteWith(normalizeLoops, new(s)).fromJust;
+  normalizedS.env = s.env;
+  normalizedS.returnType = s.returnType;
+  
+  t.iterStmtIn = stmtToIterStmt(normalizedS);
   
   local transResult::IterStmt = t.iterStmtOut;
   transResult.env = top.env;
@@ -28,10 +33,142 @@ top::Stmt ::= s::Stmt t::Transformation
     then warnStmt(s.errors)
     else if !null(t.errors)
     then warnStmt(t.errors)
+    else if !null(normalizedS.errors)
+    then warnStmt(normalizedS.errors) -- Shouldn't happen
     else if !null(transResult.errors)
-    then warnStmt(transResult.errors)
+    then warnStmt(transResult.errors) -- Shouldn't happen
     else transResult.hostTrans;
 }
+
+function rename
+s:Strategy ::= n1::String n2::String
+{
+  return s:topDown(s:try(
+    rule on Name of
+    | name(n, location=l) when n == n1 -> name(n2, location=l)
+    end));
+}
+
+function isSimple
+Boolean ::= e::Expr
+{
+  -- Avoid decorating with the full env during rewriting.
+  -- This will never make an otherwise-not-simple AST appear simple.
+  e.env = emptyEnv();
+  e.returnType = nothing();
+  return e.isSimple;
+}
+
+function isIntConst
+Boolean ::= e::Expr
+{
+  -- Avoid decorating with the full env during rewriting.
+  -- This will never make an non-int-constant AST appear to be an int constant.
+  e.env = emptyEnv();
+  e.returnType = nothing();
+  return e.integerConstantValue.isJust;
+}
+
+function intValue
+Integer ::= e::Expr
+{
+  -- Avoid decorating with the full env during rewriting.
+  -- This will never make an non-int-constant AST appear to be an int constant.
+  e.env = emptyEnv();
+  e.returnType = nothing();
+  return e.integerConstantValue.fromJust;
+}
+
+global simplifyExprs::s:Strategy =
+  rule on Expr of
+  -- Simplify expressions as much as possible
+  | ableC_Expr { ($Expr e) } -> e
+  | ableC_Expr { -$Expr e } when isIntConst(e) -> mkIntConst(-intValue(e), builtin)
+  | ableC_Expr { $Expr e1 + $Expr e2 } when isIntConst(e1) && isIntConst(e2) ->
+    mkIntConst(intValue(e1) + intValue(e2), builtin)
+  | ableC_Expr { $Expr e1 - $Expr e2 } when isIntConst(e1) && isIntConst(e2) ->
+    mkIntConst(intValue(e1) - intValue(e2), builtin)
+  | ableC_Expr { $Expr e1 * $Expr e2 } when isIntConst(e1) && isIntConst(e2) ->
+    mkIntConst(intValue(e1) * intValue(e2), builtin)
+  | ableC_Expr { $Expr e1 / $Expr e2 } when isIntConst(e1) && isIntConst(e2) && intValue(e2) > 0 ->
+    mkIntConst(intValue(e1) / intValue(e2), builtin)
+  end;
+
+global preprocessLoops::s:Strategy =
+  rule on Stmt of
+  -- Normalize condition orderings
+  | ableC_Stmt { for ($BaseTypeExpr t $Name i1 = $Expr initial; $Expr limit < $Name i2; $Expr iter) $Stmt b }
+      when i1.name == i2.name ->
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} > $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr t $Name i1 = $Expr initial; $Expr limit > $Name i2; $Expr iter) $Stmt b }
+      when i1.name == i2.name ->
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} < $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr t $Name i1 = $Expr initial; $Expr limit <= $Name i2; $Expr iter) $Stmt b }
+      when i1.name == i2.name ->
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} >= $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr t $Name i1 = $Expr initial; $Expr limit >= $Name i2; $Expr iter) $Stmt b }
+      when i1.name == i2.name ->
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} <= $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  
+  -- Normalize condition operators
+  | ableC_Stmt { for ($Decl init $Name i <= $Expr limit; $Expr iter) $Stmt b } ->
+    ableC_Stmt { for ($Decl{init} $Name{i} < $Expr{limit} + 1; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($Decl init $Name i > $Expr limit; $Expr iter) $Stmt b } ->
+    ableC_Stmt { for ($Decl{init} $Name{i} >= $Expr{limit} + 1; $Expr{iter}) $Stmt{b} }
+  
+  -- Expand increment/decrement operators
+  | ableC_Stmt { for ($Decl init $Expr cond; $Name i ++) $Stmt b } ->
+    ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} += 1) $Stmt{b} }
+  | ableC_Stmt {
+      for ($Decl init $Expr cond; $Name i --
+                                            ) // TODO fix Silver layout bug
+        $Stmt b
+      } ->
+    ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} -= 1) $Stmt{b} }
+  end;
+
+global transLoops::s:Strategy =
+  rule on Stmt of
+  -- Restore increment operator on loops that are otherwise-normal
+  | ableC_Stmt {
+      for ($BaseTypeExpr t $Name i1 = 0; $Name i2 < $Expr n; $Name i3 += 1) $Stmt b
+    } when i1.name == i2.name && i1.name == i3.name ->
+    ableC_Stmt {
+      for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < $Expr{n}; $Name{i3}++) $Stmt{b}
+    }
+  
+  -- Normalize loops with nonstandard initial or step values
+  | ableC_Stmt {
+      for ($BaseTypeExpr t $Name i1 = $Expr initial; $Name i2 < $Expr limit; $Name i3 += $Expr step)
+        $Stmt b
+    } when i1.name == i2.name && i1.name == i3.name && isSimple(initial) && isSimple(step) ->
+      let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
+      in ableC_Stmt {
+        for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < ($Expr{limit} - $Expr{initial}) / $Expr{step}; $Name{i3}++) {
+          typeof($Name{i1}) $name{newName} = $Expr{initial} + $Name{i1} * $Expr{step};
+          $Stmt{rewriteWith(rename(i1.name, newName), b).fromJust}
+        }
+      }
+      end
+  
+  -- Normalize "backwards" loops, possibly with with nonstandard initial or step values
+  | ableC_Stmt {
+      for ($BaseTypeExpr t $Name i1 = $Expr initial; $Name i2 >= $Expr limit; $Name i3 -= $Expr step)
+        $Stmt b
+    } when i1.name == i2.name && i1.name == i3.name && isSimple(initial) && isSimple(step) ->
+      let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
+      in ableC_Stmt {
+        for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < ($Expr{initial} - $Expr{limit} + 1) / $Expr{step}; $Name{i3}++) {
+          typeof($Name{i1}) $name{newName} = $Expr{initial} - $Name{i1} * $Expr{step};
+          $Stmt{rewriteWith(rename(i1.name, newName), b).fromJust}
+        }
+      }
+      end
+    end;
+
+global normalizeLoops::s:Strategy =
+  s:innermost(simplifyExprs <+ preprocessLoops) <*
+  s:outermost(simplifyExprs <+ transLoops);
 
 function stmtToIterStmt
 IterStmt ::= s::Decorated Stmt
@@ -46,44 +183,10 @@ IterStmt ::= s::Decorated Stmt
     | ableC_Stmt {
         for ($BaseTypeExpr t $Name i1 = 0; $Name i2 < $Expr n; $Name i3++)
           $Stmt b
-      } ->
-      checkLoopVars(
-        i1, i2, i3,
-        forIterStmt(t, baseTypeExpr(), i1, n, stmtToIterStmt(b)))
-    | ableC_Stmt {
-        for ($BaseTypeExpr t $Name i1 = 0; $Name i2 <= $Expr n; $Name i3++)
-          $Stmt b
-      } ->
-      checkLoopVars(
-        i1, i2, i3,
-        forIterStmt(t, baseTypeExpr(), i1, ableC_Expr { $Expr{n} + 1 }, stmtToIterStmt(b)))
-    | ableC_Stmt {
-        for ($BaseTypeExpr t $Name i1 = 0; $Name i2 < $Expr n; $Name i3 += 1)
-          $Stmt b
-      } ->
-      checkLoopVars(
-        i1, i2, i3,
-        forIterStmt(t, baseTypeExpr(), i1, n, stmtToIterStmt(b)))
-    | ableC_Stmt {
-        for ($BaseTypeExpr t $Name i1 = 0; $Name i2 <= $Expr n; $Name i3 += 1)
-          $Stmt b
-      } ->
-      checkLoopVars(
-        i1, i2, i3,
-        forIterStmt(t, baseTypeExpr(), i1, ableC_Expr { $Expr{n} + 1 }, stmtToIterStmt(b)))
+      } when i1.name == i2.name && i1.name == i3.name ->
+      forIterStmt(t, baseTypeExpr(), i1, n, stmtToIterStmt(b))
     | s -> stmtIterStmt(new(s))
     end;
-}
-
-function checkLoopVars
-IterStmt ::= i1::Name i2::Name i3::Name s::IterStmt
-{
-  return
-    if i1.name != i2.name
-    then stmtIterStmt(warnStmt([err(i2.location, s"Loop variables must match: ${i1.name}, ${i2.name}")]))
-    else if i1.name != i3.name
-    then stmtIterStmt(warnStmt([err(i3.location, s"Loop variables must match: ${i1.name}, ${i3.name}")]))
-    else s; 
 }
 
 abstract production multiForStmt
@@ -196,7 +299,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
 {
   local numThreadsPP::Document =
     case numThreads of
-      just(n) -> parens(text(toString(n)))
+    | just(n) -> parens(text(toString(n)))
     | nothing() -> notext()
     end;
   top.pp = pp"for parallel${numThreadsPP} (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";

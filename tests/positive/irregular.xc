@@ -3,9 +3,9 @@
 int main (int argc, char **argv) {
   int reference[10][10], result[10][10];
   
-  for (int x = 3; (x) > -7; x--) {
+  for (int x = 3; (x) > -6 + (1 - 2); x--) {
     for (int y = 1; 20 >= y; ((y)) += 2) {
-      reference[x + 6][y / 2] = x + y;
+      reference[x + 6][y / 2] = x + y + (1 - 1);
     }
   }
 
@@ -18,9 +18,9 @@ int main (int argc, char **argv) {
   }
 
   transform {
-    for (int x = 3; (x) > -7; x--) {
+    for (int x = 3; (x) > -6 + (1 - 2); x--) {
       for (int y = 1; 20 >= y; ((y)) += 2) {
-        result[x + 6][y / 2] = x + y;
+        result[x + 6][y / 2] = x + y + (1 - 1);
       }
     }
   } by {

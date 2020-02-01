@@ -79,7 +79,7 @@ Integer ::= e::Expr
   return e.integerConstantValue.fromJust;
 }
 
-global simplifyExprs::s:Strategy =
+global simplifyNumericExprStep::s:Strategy =
   rule on Expr of
   -- Simplify expressions as much as possible
   | ableC_Expr { ($Expr e) } -> e
@@ -94,7 +94,11 @@ global simplifyExprs::s:Strategy =
     mkIntConst(intValue(e1) / intValue(e2), builtin)
   end;
 
-global preprocessLoops::s:Strategy =
+global simplifyNumericExpr::s:Strategy = s:innermost(simplifyNumericExprStep);
+global simplifyLoopExprs::s:Strategy =
+  traverse forDeclStmt(simplifyNumericExpr, simplifyNumericExpr, simplifyNumericExpr, _);
+
+global preprocessLoop::s:Strategy =
   rule on Stmt of
   -- Normalize condition orderings
   | ableC_Stmt { for ($BaseTypeExpr t $Name i1 = $Expr initial; $Expr limit < $Name i2; $Expr iter) $Stmt b }
@@ -127,7 +131,7 @@ global preprocessLoops::s:Strategy =
     ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} -= 1) $Stmt{b} }
   end;
 
-global transLoops::s:Strategy =
+global transLoop::s:Strategy =
   rule on Stmt of
   -- Restore increment operator on loops that are otherwise-normal
   | ableC_Stmt {
@@ -167,8 +171,8 @@ global transLoops::s:Strategy =
     end;
 
 global normalizeLoops::s:Strategy =
-  s:innermost(simplifyExprs <+ preprocessLoops) <*
-  s:outermost(simplifyExprs <+ transLoops);
+  s:bottomUp(s:try(simplifyLoopExprs <* s:repeat(preprocessLoop))) <*
+  s:topDown(s:try(transLoop <* simplifyLoopExprs));
 
 function stmtToIterStmt
 IterStmt ::= s::Decorated Stmt

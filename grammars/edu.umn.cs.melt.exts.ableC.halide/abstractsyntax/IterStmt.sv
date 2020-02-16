@@ -18,7 +18,7 @@ top::Stmt ::= s::Stmt t::Transformation
     ppConcat([pp"transform ", braces(nestlines(2, s.pp)), pp" by ", braces(nestlines(2, t.pp))]);
   top.functionDefs := [];
   
-  local normalizedS::Stmt = rewriteWith(normalizeLoops, new(s)).fromJust;
+  local normalizedS::Stmt = rewriteWith(normalizeLoops, s.hostStmts).fromJust;
   normalizedS.env = s.env;
   normalizedS.returnType = s.returnType;
   
@@ -38,6 +38,45 @@ top::Stmt ::= s::Stmt t::Transformation
     else if !null(transResult.errors)
     then warnStmt(transResult.errors) -- Shouldn't happen
     else transResult.hostTrans;
+}
+
+-- Translate away extensions that forward down to for loops before applying rewrites
+synthesized attribute hostStmts::Stmt occurs on Stmt;
+
+aspect default production
+top::Stmt ::=
+{
+  top.hostStmts = top;
+}
+
+aspect production seqStmt
+top::Stmt ::= h::Stmt  t::Stmt
+{
+  propagate hostStmts;
+}
+
+aspect production compoundStmt
+top::Stmt ::= s::Stmt
+{
+  propagate hostStmts;
+}
+
+aspect production forDeclStmt
+top::Stmt ::= i::Decl  c::MaybeExpr  s::MaybeExpr  b::Stmt
+{
+  propagate hostStmts;
+}
+
+aspect production ifStmt
+top::Stmt ::= c::Expr  t::Stmt  e::Stmt
+{
+  propagate hostStmts;
+}
+
+aspect production decStmt
+top::Stmt ::= s::Decorated Stmt
+{
+  top.hostStmts = s.hostStmts;
 }
 
 function rename

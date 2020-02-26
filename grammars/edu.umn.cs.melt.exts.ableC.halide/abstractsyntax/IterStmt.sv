@@ -163,8 +163,7 @@ global preprocessLoop::s:Strategy =
   | ableC_Stmt { for ($Decl init $Expr cond; $Name i ++) $Stmt b } ->
     ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} += 1) $Stmt{b} }
   | ableC_Stmt {
-      for ($Decl init $Expr cond; $Name i --
-                                            ) // TODO fix Silver layout bug
+      for ($Decl init $Expr cond; $Name i --)
         $Stmt b
       } ->
     ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} -= 1) $Stmt{b} }

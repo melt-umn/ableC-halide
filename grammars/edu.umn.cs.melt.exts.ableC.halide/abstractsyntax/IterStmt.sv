@@ -206,7 +206,7 @@ global transLoop::s:Strategy =
         }
       }
       end
-    end;
+  end;
 
 global normalizeLoops::s:Strategy =
   s:bottomUp(s:try(simplifyLoopExprs <* s:repeat(preprocessLoop))) <*

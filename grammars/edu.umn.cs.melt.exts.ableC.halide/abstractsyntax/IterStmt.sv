@@ -121,15 +121,15 @@ Integer ::= e::Expr
 global simplifyNumericExprStep::s:Strategy =
   rule on Expr of
   -- Simplify expressions as much as possible
-  | ableC_Expr { ($Expr e) } -> e
-  | ableC_Expr { -$Expr e } when isIntConst(e) -> mkIntConst(-intValue(e), builtin)
-  | ableC_Expr { $Expr e1 + $Expr e2 } when isIntConst(e1) && isIntConst(e2) ->
+  | ableC_Expr { ($Expr{e}) } -> e
+  | ableC_Expr { -$Expr{e} } when isIntConst(e) -> mkIntConst(-intValue(e), builtin)
+  | ableC_Expr { $Expr{e1} + $Expr{e2} } when isIntConst(e1) && isIntConst(e2) ->
     mkIntConst(intValue(e1) + intValue(e2), builtin)
-  | ableC_Expr { $Expr e1 - $Expr e2 } when isIntConst(e1) && isIntConst(e2) ->
+  | ableC_Expr { $Expr{e1} - $Expr{e2} } when isIntConst(e1) && isIntConst(e2) ->
     mkIntConst(intValue(e1) - intValue(e2), builtin)
-  | ableC_Expr { $Expr e1 * $Expr e2 } when isIntConst(e1) && isIntConst(e2) ->
+  | ableC_Expr { $Expr{e1} * $Expr{e2} } when isIntConst(e1) && isIntConst(e2) ->
     mkIntConst(intValue(e1) * intValue(e2), builtin)
-  | ableC_Expr { $Expr e1 / $Expr e2 } when isIntConst(e1) && isIntConst(e2) && intValue(e2) > 0 ->
+  | ableC_Expr { $Expr{e1} / $Expr{e2} } when isIntConst(e1) && isIntConst(e2) && intValue(e2) > 0 ->
     mkIntConst(intValue(e1) / intValue(e2), builtin)
   end;
 
@@ -140,32 +140,29 @@ global simplifyLoopExprs::s:Strategy =
 global preprocessLoop::s:Strategy =
   rule on Stmt of
   -- Normalize condition orderings
-  | ableC_Stmt { for ($BaseTypeExpr t $Name i1 = $Expr initial; $Expr limit < $Name i2; $Expr iter) $Stmt b }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} < $Name{i2}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
     ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} > $Expr{limit}; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($BaseTypeExpr t $Name i1 = $Expr initial; $Expr limit > $Name i2; $Expr iter) $Stmt b }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} > $Name{i2}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
     ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} < $Expr{limit}; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($BaseTypeExpr t $Name i1 = $Expr initial; $Expr limit <= $Name i2; $Expr iter) $Stmt b }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} <= $Name{i2}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
     ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} >= $Expr{limit}; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($BaseTypeExpr t $Name i1 = $Expr initial; $Expr limit >= $Name i2; $Expr iter) $Stmt b }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} >= $Name{i2}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
     ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} <= $Expr{limit}; $Expr{iter}) $Stmt{b} }
   
   -- Normalize condition operators
-  | ableC_Stmt { for ($Decl init $Name i <= $Expr limit; $Expr iter) $Stmt b } ->
+  | ableC_Stmt { for ($Decl{init} $Name{i} <= $Expr{limit}; $Expr{iter}) $Stmt{b} } ->
     ableC_Stmt { for ($Decl{init} $Name{i} < $Expr{limit} + 1; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($Decl init $Name i > $Expr limit; $Expr iter) $Stmt b } ->
+  | ableC_Stmt { for ($Decl{init} $Name{i} > $Expr{limit}; $Expr{iter}) $Stmt{b} } ->
     ableC_Stmt { for ($Decl{init} $Name{i} >= $Expr{limit} + 1; $Expr{iter}) $Stmt{b} }
   
   -- Expand increment/decrement operators
-  | ableC_Stmt { for ($Decl init $Expr cond; $Name i ++) $Stmt b } ->
+  | ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i}++) $Stmt{b} } ->
     ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} += 1) $Stmt{b} }
-  | ableC_Stmt {
-      for ($Decl init $Expr cond; $Name i --)
-        $Stmt b
-      } ->
+  | ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i}--) $Stmt{b} } ->
     ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} -= 1) $Stmt{b} }
   end;
 
@@ -173,7 +170,7 @@ global transLoop::s:Strategy =
   rule on Stmt of
   -- Restore increment operator on loops that are otherwise-normal
   | ableC_Stmt {
-      for ($BaseTypeExpr t $Name i1 = 0; $Name i2 < $Expr n; $Name i3 += 1) $Stmt b
+      for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < $Expr{n}; $Name{i3} += 1) $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name ->
     ableC_Stmt {
       for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < $Expr{n}; $Name{i3}++) $Stmt{b}
@@ -181,8 +178,8 @@ global transLoop::s:Strategy =
   
   -- Normalize loops with nonstandard initial or step values
   | ableC_Stmt {
-      for ($BaseTypeExpr t $Name i1 = $Expr initial; $Name i2 < $Expr limit; $Name i3 += $Expr step)
-        $Stmt b
+      for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} < $Expr{limit}; $Name{i3} += $Expr{step})
+        $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name && isSimple(initial) && isSimple(step) ->
       let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
       in ableC_Stmt {
@@ -195,8 +192,8 @@ global transLoop::s:Strategy =
   
   -- Normalize "backwards" loops, possibly with with nonstandard initial or step values
   | ableC_Stmt {
-      for ($BaseTypeExpr t $Name i1 = $Expr initial; $Name i2 >= $Expr limit; $Name i3 -= $Expr step)
-        $Stmt b
+      for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} >= $Expr{limit}; $Name{i3} -= $Expr{step})
+        $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name && isSimple(initial) && isSimple(step) ->
       let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
       in ableC_Stmt {
@@ -220,11 +217,11 @@ IterStmt ::= s::Decorated Stmt
     | nullStmt() -> nullIterStmt()
     | seqStmt(s1, s2) -> seqIterStmt(stmtToIterStmt(s1), stmtToIterStmt(s2))
     | compoundStmt(s1) -> stmtToIterStmt(s1)
-    | ableC_Stmt { if ($Expr c) $Stmt t else $Stmt e } ->
+    | ableC_Stmt { if ($Expr{c}) $Stmt{t} else $Stmt{e} } ->
       condIterStmt(c, stmtToIterStmt(t), stmtToIterStmt(e))
     | ableC_Stmt {
-        for ($BaseTypeExpr t $Name i1 = 0; $Name i2 < $Expr n; $Name i3++)
-          $Stmt b
+        for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < $Expr{n}; $Name{i3}++)
+          $Stmt{b}
       } when i1.name == i2.name && i1.name == i3.name ->
       forIterStmt(t, baseTypeExpr(), i1, n, stmtToIterStmt(b))
     | s -> stmtIterStmt(new(s))

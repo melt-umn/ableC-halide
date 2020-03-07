@@ -41,7 +41,7 @@ top::Stmt ::= s::Stmt t::Transformation
 }
 
 -- Translate away extensions that forward down to for loops before applying rewrites
-synthesized attribute hostStmts::Stmt occurs on Stmt;
+functor attribute hostStmts occurs on Stmt;
 
 aspect default production
 top::Stmt ::=

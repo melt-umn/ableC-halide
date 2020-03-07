@@ -230,12 +230,12 @@ autocopy attribute numThreads::Maybe<Integer> occurs on IterStmt;
 autocopy attribute inVector::Boolean occurs on IterStmt;
 
 -- Functor attributes that perform various transformations
-synthesized attribute splitTrans::IterStmt occurs on IterStmt;
-synthesized attribute insertTrans::IterStmt occurs on IterStmt;
-synthesized attribute reorderTrans::IterStmt occurs on IterStmt;
-synthesized attribute unrollTrans::IterStmt occurs on IterStmt;
-synthesized attribute parallelizeTrans::IterStmt occurs on IterStmt;
-synthesized attribute vectorizeTrans::IterStmt occurs on IterStmt;
+functor attribute splitTrans occurs on IterStmt;
+functor attribute insertTrans occurs on IterStmt;
+functor attribute reorderTrans occurs on IterStmt;
+functor attribute unrollTrans occurs on IterStmt;
+functor attribute parallelizeTrans occurs on IterStmt;
+functor attribute vectorizeTrans occurs on IterStmt;
 
 -- Monoid attributes to collect errors for various transformations
 synthesized attribute reorderErrors::[Message] occurs on IterStmt;
@@ -475,7 +475,7 @@ synthesized attribute reorderConstructors::[Pair<String (IterStmt ::= IterStmt)>
 synthesized attribute reorderBaseIterStmt::IterStmt occurs on IterStmt;
 
 attribute reorderErrors occurs on Names;
-attribute reorderTrans occurs on Names;
+attribute reorderTrans<IterStmt> occurs on Names;
 
 aspect production consName
 top::Names ::= h::Name t::Names

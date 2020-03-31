@@ -243,11 +243,10 @@ functor attribute parallelizeTrans occurs on IterStmt;
 functor attribute vectorizeTrans occurs on IterStmt;
 
 -- Monoid attributes to collect errors for various transformations
-monoid attribute reorderErrors::[Message] with [], ++;
-monoid attribute unrollErrors::[Message] with [], ++;
-monoid attribute parallelizeErrors::[Message] with [], ++;
-monoid attribute vectorizeErrors::[Message] with [], ++;
-attribute reorderErrors, unrollErrors, parallelizeErrors, vectorizeErrors occurs on IterStmt;
+monoid attribute reorderErrors::[Message] with [], ++ occurs on IterStmt;
+monoid attribute unrollErrors::[Message] with [], ++ occurs on IterStmt;
+monoid attribute parallelizeErrors::[Message] with [], ++ occurs on IterStmt;
+monoid attribute vectorizeErrors::[Message] with [], ++ occurs on IterStmt;
 
 -- Other misc analysis attributes used by various transformations
 monoid attribute isParallel::Boolean with false, ||;

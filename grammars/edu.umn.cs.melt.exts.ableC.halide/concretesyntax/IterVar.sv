@@ -1,6 +1,6 @@
 grammar edu:umn:cs:melt:exts:ableC:halide:concretesyntax;
 
-marking terminal MultiFor_t 'forall' lexer classes {Ckeyword};
+marking terminal MultiFor_t 'forall' lexer classes {Keyword, Global};
 
 concrete productions top::Stmt_c
 | 'forall' '(' ivs::IterVars_c ')' body::Stmt_c

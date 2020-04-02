@@ -395,15 +395,15 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
       location=builtin);
   
   top.outerCutoffIsConst = 
-    case cutoff of
-      realConstant(integerConstant(num, _, _)) -> rest.outerCutoffIsConst
-    | _ -> false
+    case cutoff.integerConstantValue of
+    | just(n) -> rest.outerCutoffIsConst
+    | nothing() -> false
     end;
   
   top.outerCutoffConstVal =
-    case cutoff of
-      realConstant(integerConstant(num, _, _)) -> toInt(num) * rest.outerCutoffConstVal
-    | _ -> error("cutoff is not a constant")
+    case cutoff.integerConstantValue of
+    | just(n) -> n * rest.outerCutoffConstVal
+    | nothing() -> error("cutoff is not a constant")
     end;
 }
 
@@ -452,12 +452,12 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
       1 + ($Expr{cutoff} - 1) / $Expr{splitIterVars.outerCutoffTrans}
     };
   splitIterVar.forIterStmtCutoff =
-    case cutoff of
-      realConstant(integerConstant(num, _, _)) -> 
+    case cutoff.integerConstantValue of
+    | just(n) -> 
         if splitIterVars.outerCutoffIsConst
-        then mkIntConst(1 + (toInt(num) - 1) / splitIterVars.outerCutoffConstVal, builtin)
+        then mkIntConst(1 + (n - 1) / splitIterVars.outerCutoffConstVal, builtin)
         else forIterStmtCutoff
-    | _ -> forIterStmtCutoff
+    | nothing() -> forIterStmtCutoff
     end;
   splitIterVar.forIterStmtBody = splitIterVars.forIterStmtTrans;
 
@@ -586,17 +586,17 @@ aspect production forIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   local numIters::Integer =
-    case cutoff of
-      realConstant(integerConstant(num, _, _)) -> toInt(num)
-    | _ -> 1 -- Error when cutoff isn't constant, copy body once to catch further errors
+    case cutoff.integerConstantValue of
+    | just(n) -> n
+    | nothing() -> 1 -- Error when cutoff isn't constant, copy body once to catch further errors
     end;
     
   top.unrollErrors =
     if n.name == top.target.name
     then
-      case cutoff of
-        realConstant(integerConstant(num, _, _)) -> []
-      | _ -> [err(top.target.location, "Unrolled loop must have constant cutoff")]
+      case cutoff.integerConstantValue of
+      | just(n) -> []
+      | nothing() -> [err(top.target.location, "Unrolled loop must have constant cutoff")]
       end
     else body.unrollErrors;
 

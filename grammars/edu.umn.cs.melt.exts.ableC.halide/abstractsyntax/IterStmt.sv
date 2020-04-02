@@ -2,6 +2,7 @@ grammar edu:umn:cs:melt:exts:ableC:halide:abstractsyntax;
 
 imports silver:langutil;
 imports silver:langutil:pp;
+imports silver:rewrite as s;
 
 imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
@@ -17,7 +18,11 @@ top::Stmt ::= s::Stmt t::Transformation
     ppConcat([pp"transform ", braces(nestlines(2, s.pp)), pp" by ", braces(nestlines(2, t.pp))]);
   top.functionDefs := [];
   
-  t.iterStmtIn = stmtToIterStmt(s);
+  local normalizedS::Stmt = rewriteWith(normalizeLoops, s.hostStmts).fromJust;
+  normalizedS.env = s.env;
+  normalizedS.returnType = s.returnType;
+  
+  t.iterStmtIn = stmtToIterStmt(normalizedS);
   
   local transResult::IterStmt = t.iterStmtOut;
   transResult.env = top.env;
@@ -28,10 +33,181 @@ top::Stmt ::= s::Stmt t::Transformation
     then warnStmt(s.errors)
     else if !null(t.errors)
     then warnStmt(t.errors)
+    else if !null(normalizedS.errors)
+    then warnStmt(normalizedS.errors) -- Shouldn't happen
     else if !null(transResult.errors)
-    then warnStmt(transResult.errors)
+    then warnStmt(transResult.errors) -- Shouldn't happen
     else transResult.hostTrans;
 }
+
+-- Translate away extensions that forward down to for loops before applying rewrites
+synthesized attribute hostStmts::Stmt occurs on Stmt;
+
+aspect default production
+top::Stmt ::=
+{
+  top.hostStmts = top;
+}
+
+aspect production seqStmt
+top::Stmt ::= h::Stmt  t::Stmt
+{
+  propagate hostStmts;
+}
+
+aspect production compoundStmt
+top::Stmt ::= s::Stmt
+{
+  propagate hostStmts;
+}
+
+aspect production forDeclStmt
+top::Stmt ::= i::Decl  c::MaybeExpr  s::MaybeExpr  b::Stmt
+{
+  propagate hostStmts;
+}
+
+aspect production ifStmt
+top::Stmt ::= c::Expr  t::Stmt  e::Stmt
+{
+  propagate hostStmts;
+}
+
+aspect production decStmt
+top::Stmt ::= s::Decorated Stmt
+{
+  top.hostStmts = s.hostStmts;
+}
+
+function rename
+s:Strategy ::= n1::String n2::String
+{
+  return s:topDown(s:try(
+    rule on Name of
+    | name(n, location=l) when n == n1 -> name(n2, location=l)
+    end));
+}
+
+function isSimple
+Boolean ::= e::Expr
+{
+  -- Avoid decorating with the full env during rewriting.
+  -- This will never make an otherwise-not-simple AST appear simple.
+  e.env = emptyEnv();
+  e.returnType = nothing();
+  return e.isSimple;
+}
+
+function isIntConst
+Boolean ::= e::Expr
+{
+  -- Avoid decorating with the full env during rewriting.
+  -- This will never make an non-int-constant AST appear to be an int constant.
+  e.env = emptyEnv();
+  e.returnType = nothing();
+  return e.integerConstantValue.isJust;
+}
+
+function intValue
+Integer ::= e::Expr
+{
+  -- Avoid decorating with the full env during rewriting.
+  -- This will never make an non-int-constant AST appear to be an int constant.
+  e.env = emptyEnv();
+  e.returnType = nothing();
+  return e.integerConstantValue.fromJust;
+}
+
+global simplifyNumericExprStep::s:Strategy =
+  rule on Expr of
+  -- Simplify expressions as much as possible
+  | ableC_Expr { ($Expr{e}) } -> e
+  | ableC_Expr { -$Expr{e} } when isIntConst(e) -> mkIntConst(-intValue(e), builtin)
+  | ableC_Expr { $Expr{e1} + $Expr{e2} } when isIntConst(e1) && isIntConst(e2) ->
+    mkIntConst(intValue(e1) + intValue(e2), builtin)
+  | ableC_Expr { $Expr{e1} - $Expr{e2} } when isIntConst(e1) && isIntConst(e2) ->
+    mkIntConst(intValue(e1) - intValue(e2), builtin)
+  | ableC_Expr { $Expr{e1} * $Expr{e2} } when isIntConst(e1) && isIntConst(e2) ->
+    mkIntConst(intValue(e1) * intValue(e2), builtin)
+  | ableC_Expr { $Expr{e1} / $Expr{e2} } when isIntConst(e1) && isIntConst(e2) && intValue(e2) > 0 ->
+    mkIntConst(intValue(e1) / intValue(e2), builtin)
+  end;
+
+global simplifyNumericExpr::s:Strategy = s:innermost(simplifyNumericExprStep);
+global simplifyLoopExprs::s:Strategy =
+  traverse forDeclStmt(simplifyNumericExpr, simplifyNumericExpr, simplifyNumericExpr, _);
+
+global preprocessLoop::s:Strategy =
+  rule on Stmt of
+  -- Normalize condition orderings
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} < $Name{i2}; $Expr{iter}) $Stmt{b} }
+      when i1.name == i2.name ->
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} > $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} > $Name{i2}; $Expr{iter}) $Stmt{b} }
+      when i1.name == i2.name ->
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} < $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} <= $Name{i2}; $Expr{iter}) $Stmt{b} }
+      when i1.name == i2.name ->
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} >= $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} >= $Name{i2}; $Expr{iter}) $Stmt{b} }
+      when i1.name == i2.name ->
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} <= $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  
+  -- Normalize condition operators
+  | ableC_Stmt { for ($Decl{init} $Name{i} <= $Expr{limit}; $Expr{iter}) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{init} $Name{i} < $Expr{limit} + 1; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($Decl{init} $Name{i} > $Expr{limit}; $Expr{iter}) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{init} $Name{i} >= $Expr{limit} + 1; $Expr{iter}) $Stmt{b} }
+  
+  -- Expand increment/decrement operators
+  | ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i}++) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} += 1) $Stmt{b} }
+  | ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i}--) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} -= 1) $Stmt{b} }
+  end;
+
+global transLoop::s:Strategy =
+  rule on Stmt of
+  -- Restore increment operator on loops that are otherwise-normal
+  | ableC_Stmt {
+      for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < $Expr{n}; $Name{i3} += 1) $Stmt{b}
+    } when i1.name == i2.name && i1.name == i3.name ->
+    ableC_Stmt {
+      for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < $Expr{n}; $Name{i3}++) $Stmt{b}
+    }
+  
+  -- Normalize loops with nonstandard initial or step values
+  | ableC_Stmt {
+      for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} < $Expr{limit}; $Name{i3} += $Expr{step})
+        $Stmt{b}
+    } when i1.name == i2.name && i1.name == i3.name && isSimple(initial) && isSimple(step) ->
+      let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
+      in ableC_Stmt {
+        for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < ($Expr{limit} - $Expr{initial}) / $Expr{step}; $Name{i3}++) {
+          typeof($Name{i1}) $name{newName} = $Expr{initial} + $Name{i1} * $Expr{step};
+          $Stmt{rewriteWith(rename(i1.name, newName), b).fromJust}
+        }
+      }
+      end
+  
+  -- Normalize "backwards" loops, possibly with with nonstandard initial or step values
+  | ableC_Stmt {
+      for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} >= $Expr{limit}; $Name{i3} -= $Expr{step})
+        $Stmt{b}
+    } when i1.name == i2.name && i1.name == i3.name && isSimple(initial) && isSimple(step) ->
+      let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
+      in ableC_Stmt {
+        for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < ($Expr{initial} - $Expr{limit} + 1) / $Expr{step}; $Name{i3}++) {
+          typeof($Name{i1}) $name{newName} = $Expr{initial} - $Name{i1} * $Expr{step};
+          $Stmt{rewriteWith(rename(i1.name, newName), b).fromJust}
+        }
+      }
+      end
+  end;
+
+global normalizeLoops::s:Strategy =
+  s:bottomUp(s:try(simplifyLoopExprs <* s:repeat(preprocessLoop))) <*
+  s:topDown(s:try(transLoop <* simplifyLoopExprs));
 
 function stmtToIterStmt
 IterStmt ::= s::Decorated Stmt
@@ -41,49 +217,15 @@ IterStmt ::= s::Decorated Stmt
     | nullStmt() -> nullIterStmt()
     | seqStmt(s1, s2) -> seqIterStmt(stmtToIterStmt(s1), stmtToIterStmt(s2))
     | compoundStmt(s1) -> stmtToIterStmt(s1)
-    | ableC_Stmt { if ($Expr c) $Stmt t else $Stmt e } ->
+    | ableC_Stmt { if ($Expr{c}) $Stmt{t} else $Stmt{e} } ->
       condIterStmt(c, stmtToIterStmt(t), stmtToIterStmt(e))
     | ableC_Stmt {
-        for ($BaseTypeExpr t $Name i1 = 0; $Name i2 < $Expr n; $Name i3++)
-          $Stmt b
-      } ->
-      checkLoopVars(
-        i1, i2, i3,
-        forIterStmt(t, baseTypeExpr(), i1, n, stmtToIterStmt(b)))
-    | ableC_Stmt {
-        for ($BaseTypeExpr t $Name i1 = 0; $Name i2 <= $Expr n; $Name i3++)
-          $Stmt b
-      } ->
-      checkLoopVars(
-        i1, i2, i3,
-        forIterStmt(t, baseTypeExpr(), i1, ableC_Expr { $Expr{n} + 1 }, stmtToIterStmt(b)))
-    | ableC_Stmt {
-        for ($BaseTypeExpr t $Name i1 = 0; $Name i2 < $Expr n; $Name i3 += 1)
-          $Stmt b
-      } ->
-      checkLoopVars(
-        i1, i2, i3,
-        forIterStmt(t, baseTypeExpr(), i1, n, stmtToIterStmt(b)))
-    | ableC_Stmt {
-        for ($BaseTypeExpr t $Name i1 = 0; $Name i2 <= $Expr n; $Name i3 += 1)
-          $Stmt b
-      } ->
-      checkLoopVars(
-        i1, i2, i3,
-        forIterStmt(t, baseTypeExpr(), i1, ableC_Expr { $Expr{n} + 1 }, stmtToIterStmt(b)))
+        for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < $Expr{n}; $Name{i3}++)
+          $Stmt{b}
+      } when i1.name == i2.name && i1.name == i3.name ->
+      forIterStmt(t, baseTypeExpr(), i1, n, stmtToIterStmt(b))
     | s -> stmtIterStmt(new(s))
     end;
-}
-
-function checkLoopVars
-IterStmt ::= i1::Name i2::Name i3::Name s::IterStmt
-{
-  return
-    if i1.name != i2.name
-    then stmtIterStmt(warnStmt([err(i2.location, s"Loop variables must match: ${i1.name}, ${i2.name}")]))
-    else if i1.name != i3.name
-    then stmtIterStmt(warnStmt([err(i3.location, s"Loop variables must match: ${i1.name}, ${i3.name}")]))
-    else s; 
 }
 
 abstract production multiForStmt
@@ -168,7 +310,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
       justInitializer(exprInitializer(ableC_Expr {0})));
   d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
-  d.typeModifiersIn = bty.typeModifiers;
+  d.typeModifierIn = bty.typeModifier;
   d.isTopLevel = false;
   d.isTypedef = false;
   d.givenStorageClasses = nilStorageClass();
@@ -196,7 +338,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
 {
   local numThreadsPP::Document =
     case numThreads of
-      just(n) -> parens(text(toString(n)))
+    | just(n) -> parens(text(toString(n)))
     | nothing() -> notext()
     end;
   top.pp = pp"for parallel${numThreadsPP} (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
@@ -205,7 +347,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
-  d.typeModifiersIn = bty.typeModifiers;
+  d.typeModifierIn = bty.typeModifier;
   d.isTopLevel = false;
   d.isTypedef = false;
   d.givenStorageClasses = nilStorageClass();
@@ -248,7 +390,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
-  d.typeModifiersIn = bty.typeModifiers;
+  d.typeModifierIn = bty.typeModifier;
   d.isTopLevel = false;
   d.isTypedef = false;
   d.givenStorageClasses = nilStorageClass();
@@ -292,11 +434,8 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
   top.pp = ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp, text(" : "), cutoff.pp, comma(), space(), rest.pp]);
   top.errors :=
     bty.errors ++ mty.errors ++ cutoff.errors ++
-    case cutoff of
-      realConstant(integerConstant(num, _, _)) ->
-        if toInt(num) < 1
-        then [err(cutoff.location, "Split loop size must be >= 1")]
-        else []
+    case cutoff.integerConstantValue of
+    | just(n) when n < 1 -> [err(cutoff.location, "Split loop size must be >= 1")]
     | _ -> []
     end ++
     rest.errors;
@@ -308,7 +447,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
   bty.givenRefId = nothing();
   
   mty.baseType = bty.typerep;
-  mty.typeModifiersIn = bty.typeModifiers;
+  mty.typeModifierIn = bty.typeModifier;
 }
 
 abstract production consAnonIterVar
@@ -349,5 +488,5 @@ top::IterVar ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name
   bty.givenRefId = nothing();
   
   mty.baseType = bty.typerep;
-  mty.typeModifiersIn = bty.typeModifiers;
+  mty.typeModifierIn = bty.typeModifier;
 }

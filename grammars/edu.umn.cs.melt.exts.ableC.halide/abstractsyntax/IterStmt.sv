@@ -199,28 +199,26 @@ top::Stmt ::= ivs::IterVars body::Stmt
   forwards to ivs.forIterStmtTrans.hostTrans;
 }
 
-synthesized attribute iterDefs::[Def];
+monoid attribute iterDefs::[Def] with [], ++;
 synthesized attribute hostTrans::Stmt;
 
 nonterminal IterStmt with pp, errors, defs, iterDefs, hostTrans, env, returnType;
 
+propagate iterDefs on IterStmt;
+
 abstract production nullIterStmt
 top::IterStmt ::= 
 {
+  propagate errors, defs;
   top.pp = notext();
-  top.errors := [];
-  top.defs := [];
-  top.iterDefs = [];
   top.hostTrans = nullStmt();
 }
 
 abstract production seqIterStmt
 top::IterStmt ::= h::IterStmt t::IterStmt
 {
+  propagate errors, defs;
   top.pp = ppConcat([ h.pp, line(), t.pp ]);
-  top.errors := h.errors ++ t.errors;
-  top.defs := h.defs ++ t.defs;
-  top.iterDefs = h.iterDefs ++ t.iterDefs;
   top.hostTrans = seqStmt(h.hostTrans, t.hostTrans);
   
   t.env = addEnv(h.defs, h.env);
@@ -229,10 +227,9 @@ top::IterStmt ::= h::IterStmt t::IterStmt
 abstract production compoundIterStmt
 top::IterStmt ::= is::IterStmt
 {
+  propagate errors;
   top.pp = braces(nestlines(2, is.pp));
-  top.errors := is.errors;
   top.defs := [];
-  top.iterDefs = is.iterDefs;
   top.hostTrans = compoundStmt(is.hostTrans);
   
   is.env = openScopeEnv(top.env);
@@ -241,21 +238,16 @@ top::IterStmt ::= is::IterStmt
 abstract production stmtIterStmt
 top::IterStmt ::= s::Stmt
 {
+  propagate errors, defs;
   top.pp = braces(braces(nestlines(2, s.pp)));
-  top.errors := s.errors;
-  top.defs := s.defs;
-  top.iterDefs = [];
   top.hostTrans = s;
 }
 
 abstract production condIterStmt
 top::IterStmt ::= cond::Expr th::IterStmt el::IterStmt
 {
+  propagate errors, defs;
   top.pp = pp"if (${cond.pp})${nestlines(2, th.pp)} else ${nestlines(2, el.pp)}";
-  top.errors := cond.errors ++ th.errors ++ el.errors;
-  
-  top.defs := th.defs ++ el.defs;
-  top.iterDefs = th.iterDefs ++ el.iterDefs;
   top.hostTrans = ifStmt(cond, th.hostTrans, el.hostTrans);
 }
 
@@ -263,7 +255,8 @@ abstract production forIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   top.pp = pp"for (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
-  top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
+  top.errors := bty.errors ++ d.errors ++ cutoff.errors ++ body.errors;
+  top.errors <- n.valueRedeclarationCheckNoCompatible;
   
   production d::Declarator =
     declarator(
@@ -279,7 +272,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   d.returnType = top.returnType;
   
   top.defs := [];
-  top.iterDefs = valueDef(n.name, declaratorValueItem(d)) :: body.iterDefs;
+  top.iterDefs <- [valueDef(n.name, declaratorValueItem(d))];
   top.hostTrans =
     ableC_Stmt {
       for ($Decl{
@@ -303,7 +296,8 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
     | nothing() -> notext()
     end;
   top.pp = pp"for parallel${numThreadsPP} (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
-  top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
+  top.errors := bty.errors ++ d.errors ++ cutoff.errors ++ body.errors;
+  top.errors <- n.valueRedeclarationCheckNoCompatible;
   
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openScopeEnv(top.env);
@@ -316,7 +310,6 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   d.returnType = top.returnType;
   
   top.defs := [];
-  top.iterDefs = body.iterDefs;
   
   {- TODO: We don't right now have a way to insert pragmas via abstract syntax, and OpenMP is
    - rather picky about the loop variable being declared in the loop and extra parentheses in the
@@ -346,7 +339,8 @@ abstract production vectorForIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   top.pp = pp"for vector (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
-  top.errors := bty.errors ++ n.valueRedeclarationCheckNoCompatible ++ d.errors ++ cutoff.errors ++ body.errors;
+  top.errors := bty.errors ++ d.errors ++ cutoff.errors ++ body.errors;
+  top.errors <- n.valueRedeclarationCheckNoCompatible;
   
   production d::Declarator = declarator(n, mty, nilAttribute(), nothingInitializer());
   d.env = openScopeEnv(top.env);
@@ -359,7 +353,6 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   d.returnType = top.returnType;
   
   top.defs := [];
-  top.iterDefs = body.iterDefs;
   
   {- TODO: We don't right now have a way to insert pragmas via abstract syntax, and OpenMP is
    - rather picky about the loop variable being declared in the loop and extra parentheses in the
@@ -387,19 +380,19 @@ synthesized attribute iterVarNames::[Name];
 synthesized attribute forIterStmtTrans::IterStmt;
 inherited attribute forIterStmtBody::IterStmt;
 
-nonterminal IterVars with pp,errors, iterVarNames, forIterStmtTrans, forIterStmtBody, env, returnType;
+nonterminal IterVars with pp, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, env, returnType;
+
+propagate errors on IterVars;
 
 abstract production consIterVar
 top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr rest::IterVars
 {
   top.pp = ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp, text(" : "), cutoff.pp, comma(), space(), rest.pp]);
-  top.errors :=
-    bty.errors ++ mty.errors ++ cutoff.errors ++
+  top.errors <-
     case cutoff.integerConstantValue of
     | just(n) when n < 1 -> [err(cutoff.location, "Split loop size must be >= 1")]
     | _ -> []
-    end ++
-    rest.errors;
+    end;
   top.iterVarNames = n :: rest.iterVarNames;
   
   top.forIterStmtTrans = forIterStmt(bty, mty, n, cutoff, rest.forIterStmtTrans);
@@ -427,7 +420,6 @@ abstract production nilIterVar
 top::IterVars ::= 
 {
   top.pp = notext();
-  top.errors := [];
   top.iterVarNames = [];
   top.forIterStmtTrans = top.forIterStmtBody;
 }
@@ -438,11 +430,12 @@ inherited attribute forIterStmtCutoff::Expr;
 
 nonterminal IterVar with pp, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff, forIterStmtBody, env, returnType;
 
+propagate errors on IterVar;
+
 abstract production iterVar
 top::IterVar ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name
 {
   top.pp = ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp]);
-  top.errors := bty.errors ++ mty.errors;
   top.iterVarName = n;
   top.forIterStmtTrans = forIterStmt(bty, mty, n, top.forIterStmtCutoff, top.forIterStmtBody);
   

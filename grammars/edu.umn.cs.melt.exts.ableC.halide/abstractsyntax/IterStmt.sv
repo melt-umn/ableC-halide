@@ -2,7 +2,7 @@ grammar edu:umn:cs:melt:exts:ableC:halide:abstractsyntax;
 
 imports silver:langutil;
 imports silver:langutil:pp;
-imports silver:rewrite as s;
+imports core:monad;
 
 imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
@@ -18,7 +18,7 @@ top::Stmt ::= s::Stmt t::Transformation
     ppConcat([pp"transform ", braces(nestlines(2, s.pp)), pp" by ", braces(nestlines(2, t.pp))]);
   top.functionDefs := [];
   
-  local normalizedS::Stmt = rewriteWith(normalizeLoops, new(s)).fromJust;
+  local normalizedS::Stmt = s.normalizeLoops.fromJust;
   normalizedS.env = s.env;
   normalizedS.returnType = s.returnType;
   
@@ -28,7 +28,7 @@ top::Stmt ::= s::Stmt t::Transformation
   transResult.env = top.env;
   transResult.returnType = top.returnType;
   
-  forwards to
+  forwards to unsafeTrace(
     if !null(s.errors)
     then warnStmt(s.errors)
     else if !null(t.errors)
@@ -37,16 +37,8 @@ top::Stmt ::= s::Stmt t::Transformation
     then warnStmt(normalizedS.errors) -- Shouldn't happen
     else if !null(transResult.errors)
     then warnStmt(transResult.errors) -- Shouldn't happen
-    else transResult.hostTrans;
-}
-
-function rename
-s:Strategy ::= n1::String n2::String
-{
-  return s:topDown(s:try(
-    rule on Name of
-    | name(n, location=l) when n == n1 -> name(n2, location=l)
-    end));
+    else transResult.hostTrans,
+    print(hackUnparse(normalizedS), unsafeIO()));
 }
 
 function isSimple
@@ -79,7 +71,7 @@ Integer ::= e::Expr
   return e.integerConstantValue.fromJust;
 }
 
-global simplifyNumericExprStep::s:Strategy =
+strategy attribute simplifyNumericExprStep =
   rule on Expr of
   -- Simplify expressions as much as possible
   | ableC_Expr { ($Expr{e}) } -> e
@@ -94,11 +86,16 @@ global simplifyNumericExprStep::s:Strategy =
     mkIntConst(intValue(e1) / intValue(e2), builtin)
   end;
 
-global simplifyNumericExpr::s:Strategy = s:innermost(simplifyNumericExprStep);
-global simplifyLoopExprs::s:Strategy =
-  traverse forDeclStmt(simplifyNumericExpr, simplifyNumericExpr, simplifyNumericExpr, _);
+strategy attribute simplifyNumericExpr = innermost(simplifyNumericExprStep);
+strategy attribute simplifyLoopExprs =
+  forDeclStmt(simplifyNumericExpr, simplifyNumericExpr, simplifyNumericExpr, id);
 
-global preprocessLoop::s:Strategy =
+attribute simplifyNumericExprStep, simplifyNumericExpr, simplifyLoopExprs occurs on
+  Stmt, Decl, Declarators, Declarator, MaybeInitializer, Initializer, MaybeExpr, Expr;
+propagate simplifyNumericExprStep, simplifyNumericExpr, simplifyLoopExprs on
+  Stmt, Decl, Declarators, Declarator, MaybeInitializer, Initializer, MaybeExpr, Expr;
+
+strategy attribute preprocessLoop =
   rule on Stmt of
   -- Normalize condition orderings
   | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} < $Name{i2}; $Expr{iter}) $Stmt{b} }
@@ -127,7 +124,58 @@ global preprocessLoop::s:Strategy =
     ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} -= 1) $Stmt{b} }
   end;
 
-global transLoop::s:Strategy =
+-- Functor transformation to perform a renaming over anything
+-- Not capture-avoiding, but that's OK!
+-- If we rename a shadowed name, then we will also rename the shadowing declaration.
+autocopy attribute targetName::String;
+autocopy attribute replacement::String;
+functor attribute renamed;
+aspect production name
+top::Name ::= n::String
+{
+  top.renamed =
+    if n == top.targetName
+    then name(top.replacement, location=top.location)
+    else top;
+}
+
+attribute targetName, replacement, renamed occurs on
+  Name, MaybeName,
+  GlobalDecls, Decls, Decl, Declarators, Declarator, FunctionDecl, Parameters, ParameterDecl, StructDecl, UnionDecl, EnumDecl, StructItemList, EnumItemList, StructItem, StructDeclarators, StructDeclarator, EnumItem,
+  MemberDesignator,
+  Expr, GenericAssocs, GenericAssoc,
+  TypeName, BaseTypeExpr, TypeModifierExpr, TypeNames,
+  NumericConstant,
+  MaybeExpr, Exprs, ExprOrTypeName,
+  Stmt,
+  MaybeInitializer, Initializer, InitList, Init, Designator,
+  SpecialSpecifiers;
+propagate renamed on
+  Name, MaybeName,
+  GlobalDecls, Decls, Decl, Declarators, Declarator, FunctionDecl, Parameters, ParameterDecl, StructDecl, UnionDecl, EnumDecl, StructItemList, EnumItemList, StructItem, StructDeclarators, StructDeclarator, EnumItem,
+  MemberDesignator,
+  Expr, GenericAssocs, GenericAssoc,
+  TypeName, BaseTypeExpr, TypeModifierExpr, TypeNames,
+  NumericConstant,
+  MaybeExpr, Exprs, ExprOrTypeName,
+  Stmt,
+  MaybeInitializer, Initializer, InitList, Init, Designator,
+  SpecialSpecifiers
+  excluding name;
+
+aspect production forDeclStmt
+top::Stmt ::= i::Decl  c::MaybeExpr  s::MaybeExpr  b::Stmt
+{
+  local iName::String =
+    case i of
+    | ableC_Decl { $BaseTypeExpr{_} $Name{name(n)} = $Expr{_}; } -> n
+    | _ -> error("Only should be demanded for a variable initializer")
+    end;
+  b.targetName = iName;
+  b.replacement = s"_iter_${iName}_${toString(genInt())}";
+}
+
+strategy attribute transLoop =
   rule on Stmt of
   -- Restore increment operator on loops that are otherwise-normal
   | ableC_Stmt {
@@ -142,33 +190,32 @@ global transLoop::s:Strategy =
       for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} < $Expr{limit}; $Name{i3} += $Expr{step})
         $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name && isSimple(initial) && isSimple(step) ->
-      let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
-      in ableC_Stmt {
+      ableC_Stmt {
         for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < ($Expr{limit} - $Expr{initial}) / $Expr{step}; $Name{i3}++) {
-          typeof($Name{i1}) $name{newName} = $Expr{initial} + $Name{i1} * $Expr{step};
-          $Stmt{rewriteWith(rename(i1.name, newName), b).fromJust}
+          typeof($Name{i1}) $name{b.replacement} = $Expr{initial} + $Name{i1} * $Expr{step};
+          $Stmt{b.renamed}
         }
       }
-      end
   
   -- Normalize "backwards" loops, possibly with with nonstandard initial or step values
   | ableC_Stmt {
       for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} >= $Expr{limit}; $Name{i3} -= $Expr{step})
         $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name && isSimple(initial) && isSimple(step) ->
-      let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
-      in ableC_Stmt {
+      ableC_Stmt {
         for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < ($Expr{initial} - $Expr{limit} + 1) / $Expr{step}; $Name{i3}++) {
-          typeof($Name{i1}) $name{newName} = $Expr{initial} - $Name{i1} * $Expr{step};
-          $Stmt{rewriteWith(rename(i1.name, newName), b).fromJust}
+          typeof($Name{i1}) $name{b.replacement} = $Expr{initial} - $Name{i1} * $Expr{step};
+          $Stmt{b.renamed}
         }
       }
-      end
   end;
 
-global normalizeLoops::s:Strategy =
-  s:bottomUp(s:try(simplifyLoopExprs <* s:repeat(preprocessLoop))) <*
-  s:topDown(s:try(transLoop <* simplifyLoopExprs));
+strategy attribute normalizeLoops =
+  bottomUp(try(simplifyLoopExprs <* repeat(preprocessLoop))) <*
+  topDown(try(transLoop <* simplifyLoopExprs));
+
+attribute preprocessLoop, transLoop, normalizeLoops occurs on Stmt;
+propagate preprocessLoop, transLoop, normalizeLoops on Stmt;
 
 function stmtToIterStmt
 IterStmt ::= s::Decorated Stmt

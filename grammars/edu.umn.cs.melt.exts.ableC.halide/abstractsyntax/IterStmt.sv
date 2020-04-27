@@ -181,7 +181,7 @@ IterStmt ::= s::Decorated Stmt
     | ableC_Stmt { if ($Expr{c}) $Stmt{t} else $Stmt{e} } ->
       condIterStmt(c, stmtToIterStmt(t), stmtToIterStmt(e))
     | ableC_Stmt {
-        for ($BaseTypeExpr{t} $Name{i1} = 0; host::$Name{i2} host::< $Expr{n}; $Name{i3} host::++)
+        for ($BaseTypeExpr{t} $Name{i1} = 0; host::$Name{i2} host::< $Expr{n}; host::$Name{i3} host::++)
           $Stmt{b}
       } when i1.name == i2.name && i1.name == i3.name ->
       forIterStmt(t, baseTypeExpr(), i1, n, stmtToIterStmt(b))

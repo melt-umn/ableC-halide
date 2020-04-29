@@ -180,8 +180,9 @@ strategy attribute transLoop =
   end;
 
 strategy attribute normalizeLoops =
-  bottomUp(try(simplifyLoopExprs <* repeat(preprocessLoop))) <*
-  topDown(try(transLoop <* simplifyLoopExprs));
+  downUp(
+    try(simplifyLoopExprs <* repeat(preprocessLoop)),
+    try(transLoop <* simplifyLoopExprs));
 
 attribute preprocessLoop, transLoop, normalizeLoops occurs on Stmt;
 propagate preprocessLoop, transLoop, normalizeLoops on Stmt;

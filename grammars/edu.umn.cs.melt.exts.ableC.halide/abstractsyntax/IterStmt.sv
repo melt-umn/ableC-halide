@@ -101,20 +101,16 @@ partial strategy attribute preprocessLoop =
     ableC_Stmt { for ($Decl{init} $Expr{cond}; host::$Name{i} host::-= 1) $Stmt{b} }
   end;
 
--- Functor transformation to perform a renaming over anything
+-- Transformation to perform a renaming over anything
 -- Not capture-avoiding, but that's OK!
 -- If we rename a shadowed name, then we will also rename the shadowing declaration.
 autocopy attribute targetName::String;
 autocopy attribute replacement::String;
-functor attribute renamed;
-aspect production name
-top::Name ::= n::String
-{
-  top.renamed =
-    if n == top.targetName
-    then name(top.replacement, location=top.location)
-    else top;
-}
+strategy attribute renamed =
+  allTopDown(
+    rule on top::Name of
+    | name(n) when n == top.targetName -> name(top.replacement, location=top.location)
+    end);
 
 attribute targetName, replacement, renamed occurs on
   Name, MaybeName,
@@ -137,8 +133,7 @@ propagate renamed on
   MaybeExpr, Exprs, ExprOrTypeName,
   Stmt,
   MaybeInitializer, Initializer, InitList, Init, Designator,
-  SpecialSpecifiers
-  excluding name;
+  SpecialSpecifiers;
 
 partial strategy attribute transLoop =
   rule on Stmt of

@@ -18,7 +18,7 @@ top::Stmt ::= s::Stmt t::Transformation
     ppConcat([pp"transform ", braces(nestlines(2, s.pp)), pp" by ", braces(nestlines(2, t.pp))]);
   top.functionDefs := [];
   
-  local normalizedS::Stmt = s.normalizeLoops.fromJust;
+  local normalizedS::Stmt = s.normalizeLoops;
   normalizedS.env = s.env;
   normalizedS.returnType = s.returnType;
   
@@ -40,7 +40,7 @@ top::Stmt ::= s::Stmt t::Transformation
     else transResult.hostTrans;
 }
 
-strategy attribute simplifyNumericExprStep =
+partial strategy attribute simplifyNumericExprStep =
 {-  rule on Expr of
   | e -> unsafeTrace(e, print(show(80, e.pp) ++ "\n\n", unsafeIO()))
   end <*-}
@@ -64,7 +64,7 @@ strategy attribute simplifyNumericExprStep =
   end;
 
 strategy attribute simplifyNumericExpr = innermost(simplifyNumericExprStep);
-strategy attribute simplifyLoopExprs =
+partial strategy attribute simplifyLoopExprs =
   forDeclStmt(simplifyNumericExpr, simplifyNumericExpr, simplifyNumericExpr, id);
 
 attribute simplifyNumericExprStep, simplifyNumericExpr, simplifyLoopExprs occurs on
@@ -72,7 +72,7 @@ attribute simplifyNumericExprStep, simplifyNumericExpr, simplifyLoopExprs occurs
 propagate simplifyNumericExprStep, simplifyNumericExpr, simplifyLoopExprs on
   Stmt, Decl, Declarators, Declarator, MaybeInitializer, Initializer, MaybeExpr, Expr;
 
-strategy attribute preprocessLoop =
+partial strategy attribute preprocessLoop =
   rule on Stmt of
   -- Normalize condition orderings
   | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} host::< host::$Name{i2}; $Expr{iter}) $Stmt{b} }
@@ -140,7 +140,7 @@ propagate renamed on
   SpecialSpecifiers
   excluding name;
 
-strategy attribute transLoop =
+partial strategy attribute transLoop =
   rule on Stmt of
   -- Restore increment operator on loops that are otherwise-normal
   | ableC_Stmt {

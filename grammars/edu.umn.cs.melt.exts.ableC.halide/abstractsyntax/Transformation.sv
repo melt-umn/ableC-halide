@@ -19,9 +19,7 @@ top::Transformation ::= h::Transformation t::Transformation
   top.pp = ppConcat([h.pp, line(), t.pp]);
   top.errors := if !null(h.errors) then h.errors else t.errors;
   
-  h.iterStmtIn = top.iterStmtIn;
-  t.iterStmtIn = h.iterStmtOut;
-  top.iterStmtOut = t.iterStmtOut;
+  thread iterStmtIn, iterStmtOut on top, h, t, top;
 }
 
 abstract production splitTransformation

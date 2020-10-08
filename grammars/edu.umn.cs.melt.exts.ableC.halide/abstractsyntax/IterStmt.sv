@@ -2,7 +2,7 @@ grammar edu:umn:cs:melt:exts:ableC:halide:abstractsyntax;
 
 imports silver:langutil;
 imports silver:langutil:pp;
-imports silver:rewrite as s;
+imports core:monad;
 
 imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
@@ -18,7 +18,7 @@ top::Stmt ::= s::Stmt t::Transformation
     ppConcat([pp"transform ", braces(nestlines(2, s.pp)), pp" by ", braces(nestlines(2, t.pp))]);
   top.functionDefs := [];
   
-  local normalizedS::Stmt = rewriteWith(normalizeLoops, new(s)).fromJust;
+  local normalizedS::Stmt = s.normalizeLoops;
   normalizedS.env = s.env;
   normalizedS.returnType = s.returnType;
   
@@ -40,135 +40,147 @@ top::Stmt ::= s::Stmt t::Transformation
     else transResult.hostTrans;
 }
 
-function rename
-s:Strategy ::= n1::String n2::String
-{
-  return s:topDown(s:try(
-    rule on Name of
-    | name(n, location=l) when n == n1 -> name(n2, location=l)
-    end));
-}
-
-function isSimple
-Boolean ::= e::Expr
-{
-  -- Avoid decorating with the full env during rewriting.
-  -- This will never make an otherwise-not-simple AST appear simple.
-  e.env = emptyEnv();
-  e.returnType = nothing();
-  return e.isSimple;
-}
-
-function isIntConst
-Boolean ::= e::Expr
-{
-  -- Avoid decorating with the full env during rewriting.
-  -- This will never make an non-int-constant AST appear to be an int constant.
-  e.env = emptyEnv();
-  e.returnType = nothing();
-  return e.integerConstantValue.isJust;
-}
-
-function intValue
-Integer ::= e::Expr
-{
-  -- Avoid decorating with the full env during rewriting.
-  -- This will never make an non-int-constant AST appear to be an int constant.
-  e.env = emptyEnv();
-  e.returnType = nothing();
-  return e.integerConstantValue.fromJust;
-}
-
-global simplifyNumericExprStep::s:Strategy =
+partial strategy attribute simplifyNumericExprStep =
+{-  rule on Expr of
+  | e -> unsafeTrace(e, print(show(80, e.pp) ++ "\n\n", unsafeIO()))
+  end <*-}
   rule on Expr of
   -- Simplify expressions as much as possible
   | ableC_Expr { ($Expr{e}) } -> e
-  | ableC_Expr { -$Expr{e} } when isIntConst(e) -> mkIntConst(-intValue(e), builtin)
-  | ableC_Expr { $Expr{e1} + $Expr{e2} } when isIntConst(e1) && isIntConst(e2) ->
-    mkIntConst(intValue(e1) + intValue(e2), builtin)
-  | ableC_Expr { $Expr{e1} - $Expr{e2} } when isIntConst(e1) && isIntConst(e2) ->
-    mkIntConst(intValue(e1) - intValue(e2), builtin)
-  | ableC_Expr { $Expr{e1} * $Expr{e2} } when isIntConst(e1) && isIntConst(e2) ->
-    mkIntConst(intValue(e1) * intValue(e2), builtin)
-  | ableC_Expr { $Expr{e1} / $Expr{e2} } when isIntConst(e1) && isIntConst(e2) && intValue(e2) > 0 ->
-    mkIntConst(intValue(e1) / intValue(e2), builtin)
+  | ableC_Expr { host::-$Expr{e} } when e.integerConstantValue.isJust ->
+    mkIntConst(-e.integerConstantValue.fromJust, builtin)
+  | ableC_Expr { $Expr{e1} host::+ $Expr{e2} }
+    when e1.integerConstantValue.isJust && e2.integerConstantValue.isJust ->
+    mkIntConst(e1.integerConstantValue.fromJust + e2.integerConstantValue.fromJust, builtin)
+  | ableC_Expr { $Expr{e1} host::- $Expr{e2} }
+    when e1.integerConstantValue.isJust && e2.integerConstantValue.isJust ->
+    mkIntConst(e1.integerConstantValue.fromJust - e2.integerConstantValue.fromJust, builtin)
+  | ableC_Expr { $Expr{e1} host::* $Expr{e2} }
+    when e1.integerConstantValue.isJust && e2.integerConstantValue.isJust ->
+    mkIntConst(e1.integerConstantValue.fromJust * e2.integerConstantValue.fromJust, builtin)
+  | ableC_Expr { $Expr{e1} host::/ $Expr{e2} }
+    when e1.integerConstantValue.isJust && e2.integerConstantValue.isJust && e1.integerConstantValue.fromJust != 0 ->
+    mkIntConst(e1.integerConstantValue.fromJust / e2.integerConstantValue.fromJust, builtin)
   end;
 
-global simplifyNumericExpr::s:Strategy = s:innermost(simplifyNumericExprStep);
-global simplifyLoopExprs::s:Strategy =
-  traverse forDeclStmt(simplifyNumericExpr, simplifyNumericExpr, simplifyNumericExpr, _);
+strategy attribute simplifyNumericExpr = innermost(simplifyNumericExprStep);
+partial strategy attribute simplifyLoopExprs =
+  forDeclStmt(simplifyNumericExpr, simplifyNumericExpr, simplifyNumericExpr, id);
 
-global preprocessLoop::s:Strategy =
+attribute simplifyNumericExprStep, simplifyNumericExpr, simplifyLoopExprs occurs on
+  Stmt, Decl, Declarators, Declarator, MaybeInitializer, Initializer, MaybeExpr, Expr;
+propagate simplifyNumericExprStep, simplifyNumericExpr, simplifyLoopExprs on
+  Stmt, Decl, Declarators, Declarator, MaybeInitializer, Initializer, MaybeExpr, Expr;
+
+partial strategy attribute preprocessLoop =
   rule on Stmt of
   -- Normalize condition orderings
-  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} < $Name{i2}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} host::< host::$Name{i2}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
-    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} > $Expr{limit}; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} > $Name{i2}; $Expr{iter}) $Stmt{b} }
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; host::$Name{i2} host::> $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} host::> host::$Name{i2}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
-    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} < $Expr{limit}; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} <= $Name{i2}; $Expr{iter}) $Stmt{b} }
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; host::$Name{i2} host::< $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} host::<= host::$Name{i2}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
-    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} >= $Expr{limit}; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} >= $Name{i2}; $Expr{iter}) $Stmt{b} }
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; host::$Name{i2} host::>= $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} host::>= host::$Name{i2}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
-    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} <= $Expr{limit}; $Expr{iter}) $Stmt{b} }
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; host::$Name{i2} host::<= $Expr{limit}; $Expr{iter}) $Stmt{b} }
   
   -- Normalize condition operators
-  | ableC_Stmt { for ($Decl{init} $Name{i} <= $Expr{limit}; $Expr{iter}) $Stmt{b} } ->
-    ableC_Stmt { for ($Decl{init} $Name{i} < $Expr{limit} + 1; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($Decl{init} $Name{i} > $Expr{limit}; $Expr{iter}) $Stmt{b} } ->
-    ableC_Stmt { for ($Decl{init} $Name{i} >= $Expr{limit} + 1; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($Decl{init} host::$Name{i} host::<= $Expr{limit}; $Expr{iter}) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{init} host::$Name{i} host::< $Expr{limit} + 1; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($Decl{init} host::$Name{i} host::> $Expr{limit}; $Expr{iter}) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{init} host::$Name{i} host::>= $Expr{limit} + 1; $Expr{iter}) $Stmt{b} }
   
   -- Expand increment/decrement operators
-  | ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i}++) $Stmt{b} } ->
-    ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} += 1) $Stmt{b} }
-  | ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i}--) $Stmt{b} } ->
-    ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} -= 1) $Stmt{b} }
+  | ableC_Stmt { for ($Decl{init} $Expr{cond}; host::$Name{i} host::++) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{init} $Expr{cond}; host::$Name{i} host::+= 1) $Stmt{b} }
+  | ableC_Stmt { for ($Decl{init} $Expr{cond}; host::$Name{i} host::--) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{init} $Expr{cond}; host::$Name{i} host::-= 1) $Stmt{b} }
   end;
 
-global transLoop::s:Strategy =
+-- Transformation to perform a renaming over anything
+-- Not capture-avoiding, but that's OK!
+-- If we rename a shadowed name, then we will also rename the shadowing declaration.
+autocopy attribute targetName::String;
+autocopy attribute replacement::String;
+strategy attribute renamed =
+  allTopDown(
+    rule on top::Name of
+    | name(n) when n == top.targetName -> name(top.replacement, location=top.location)
+    end);
+
+attribute targetName, replacement, renamed occurs on
+  Name, MaybeName,
+  GlobalDecls, Decls, Decl, Declarators, Declarator, FunctionDecl, Parameters, ParameterDecl, StructDecl, UnionDecl, EnumDecl, StructItemList, EnumItemList, StructItem, StructDeclarators, StructDeclarator, EnumItem,
+  MemberDesignator,
+  Expr, GenericAssocs, GenericAssoc,
+  TypeName, BaseTypeExpr, TypeModifierExpr, TypeNames,
+  NumericConstant,
+  MaybeExpr, Exprs, ExprOrTypeName,
+  Stmt,
+  MaybeInitializer, Initializer, InitList, Init, Designator,
+  SpecialSpecifiers;
+propagate renamed on
+  Name, MaybeName,
+  GlobalDecls, Decls, Decl, Declarators, Declarator, FunctionDecl, Parameters, ParameterDecl, StructDecl, UnionDecl, EnumDecl, StructItemList, EnumItemList, StructItem, StructDeclarators, StructDeclarator, EnumItem,
+  MemberDesignator,
+  Expr, GenericAssocs, GenericAssoc,
+  TypeName, BaseTypeExpr, TypeModifierExpr, TypeNames,
+  NumericConstant,
+  MaybeExpr, Exprs, ExprOrTypeName,
+  Stmt,
+  MaybeInitializer, Initializer, InitList, Init, Designator,
+  SpecialSpecifiers;
+
+partial strategy attribute transLoop =
   rule on Stmt of
   -- Restore increment operator on loops that are otherwise-normal
   | ableC_Stmt {
-      for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < $Expr{n}; $Name{i3} += 1) $Stmt{b}
+      for ($BaseTypeExpr{t} $Name{i1} = 0; host::$Name{i2} host::< $Expr{n}; host::$Name{i3} host::+= 1) $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name ->
     ableC_Stmt {
-      for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < $Expr{n}; $Name{i3}++) $Stmt{b}
+      for ($BaseTypeExpr{t} $Name{i1} = 0; host::$Name{i2} host::< $Expr{n}; host::$Name{i3} host::++) $Stmt{b}
     }
   
   -- Normalize loops with nonstandard initial or step values
   | ableC_Stmt {
-      for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} < $Expr{limit}; $Name{i3} += $Expr{step})
+      for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; host::$Name{i2} host::< $Expr{limit}; host::$Name{i3} host::+= $Expr{step})
         $Stmt{b}
-    } when i1.name == i2.name && i1.name == i3.name && isSimple(initial) && isSimple(step) ->
+    } when i1.name == i2.name && i1.name == i3.name && initial.isSimple && step.isSimple ->
       let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
       in ableC_Stmt {
-        for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < ($Expr{limit} - $Expr{initial}) / $Expr{step}; $Name{i3}++) {
+        for ($BaseTypeExpr{t} $Name{i1} = 0; host::$Name{i2} host::< ($Expr{limit} - $Expr{initial}) / $Expr{step}; host::$Name{i3} host::++) {
           typeof($Name{i1}) $name{newName} = $Expr{initial} + $Name{i1} * $Expr{step};
-          $Stmt{rewriteWith(rename(i1.name, newName), b).fromJust}
+          $Stmt{decorate b with { targetName = i1.name; replacement = newName; env = top.env; returnType = top.returnType; }.renamed}
         }
       }
       end
   
   -- Normalize "backwards" loops, possibly with with nonstandard initial or step values
   | ableC_Stmt {
-      for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Name{i2} >= $Expr{limit}; $Name{i3} -= $Expr{step})
+      for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; host::$Name{i2} host::>= $Expr{limit}; host::$Name{i3} host::-= $Expr{step})
         $Stmt{b}
-    } when i1.name == i2.name && i1.name == i3.name && isSimple(initial) && isSimple(step) ->
+    } when i1.name == i2.name && i1.name == i3.name && initial.isSimple && step.isSimple ->
       let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
       in ableC_Stmt {
-        for ($BaseTypeExpr{t} $Name{i1} = 0; $Name{i2} < ($Expr{initial} - $Expr{limit} + 1) / $Expr{step}; $Name{i3}++) {
+        for ($BaseTypeExpr{t} $Name{i1} = 0; host::$Name{i2} host::< ($Expr{initial} - $Expr{limit} + 1) / $Expr{step}; host::$Name{i3} host::++) {
           typeof($Name{i1}) $name{newName} = $Expr{initial} - $Name{i1} * $Expr{step};
-          $Stmt{rewriteWith(rename(i1.name, newName), b).fromJust}
+          $Stmt{decorate b with { targetName = i1.name; replacement = newName; env = top.env; returnType = top.returnType; }.renamed}
         }
       }
       end
   end;
 
-global normalizeLoops::s:Strategy =
-  s:bottomUp(s:try(simplifyLoopExprs <* s:repeat(preprocessLoop))) <*
-  s:topDown(s:try(transLoop <* simplifyLoopExprs));
+strategy attribute normalizeLoops =
+  downUp(
+    try(simplifyLoopExprs <* repeat(preprocessLoop)),
+    try(transLoop <* simplifyLoopExprs));
+
+attribute preprocessLoop, transLoop, normalizeLoops occurs on Stmt;
+propagate preprocessLoop, transLoop, normalizeLoops on Stmt;
 
 function stmtToIterStmt
 IterStmt ::= s::Decorated Stmt

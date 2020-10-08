@@ -5,7 +5,6 @@ synthesized attribute iterStmtOut::IterStmt;
 
 nonterminal Transformation with location, pp, errors, iterStmtIn, iterStmtOut, env, returnType;
 
-
 abstract production nullTransformation
 top::Transformation ::= 
 {
@@ -236,17 +235,18 @@ autocopy attribute inVector::Boolean occurs on IterStmt;
 
 -- Functor attributes that perform various transformations
 functor attribute splitTrans occurs on IterStmt;
-functor attribute insertTrans occurs on IterStmt;
 functor attribute reorderTrans occurs on IterStmt;
 functor attribute unrollTrans occurs on IterStmt;
 functor attribute parallelizeTrans occurs on IterStmt;
 functor attribute vectorizeTrans occurs on IterStmt;
+propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans on IterStmt excluding forIterStmt;
 
 -- Monoid attributes to collect errors for various transformations
 monoid attribute reorderErrors::[Message] with [], ++ occurs on IterStmt;
 monoid attribute unrollErrors::[Message] with [], ++ occurs on IterStmt;
 monoid attribute parallelizeErrors::[Message] with [], ++ occurs on IterStmt;
 monoid attribute vectorizeErrors::[Message] with [], ++ occurs on IterStmt;
+propagate reorderErrors, unrollErrors, parallelizeErrors, vectorizeErrors on IterStmt excluding forIterStmt;
 
 -- Other misc analysis attributes used by various transformations
 monoid attribute isParallel::Boolean with false, ||;
@@ -254,57 +254,9 @@ monoid attribute isVector::Boolean with false, ||;
 attribute isParallel, isVector occurs on IterStmt;
 propagate isParallel, isVector on IterStmt;
 
--- Aspects for base cases for various transformations
-aspect default production
-top::IterStmt ::= 
-{
-  top.insertTrans = top.insertedTransFn(top);
-  top.reorderConstructors = [];
-  top.reorderBaseIterStmt = top;
-}
-
--- Propagate the above functor and monoid attributes for all productions except forIterStmt
-aspect production nullIterStmt
-top::IterStmt ::= 
-{
-  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
-  propagate reorderErrors, unrollErrors, parallelizeErrors, vectorizeErrors;
-}
-
-aspect production seqIterStmt
-top::IterStmt ::= h::IterStmt t::IterStmt
-{
-  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
-  propagate reorderErrors, unrollErrors, parallelizeErrors, vectorizeErrors;
-}
-
-aspect production compoundIterStmt
-top::IterStmt ::= is::IterStmt
-{
-  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
-  propagate reorderErrors, unrollErrors, parallelizeErrors, vectorizeErrors;
-}
-
-aspect production stmtIterStmt
-top::IterStmt ::= s::Stmt
-{
-  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
-  propagate reorderErrors, unrollErrors, parallelizeErrors, vectorizeErrors;
-}
-
-aspect production condIterStmt
-top::IterStmt ::= cond::Expr th::IterStmt el::IterStmt
-{
-  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
-  propagate reorderErrors, unrollErrors, parallelizeErrors, vectorizeErrors;
-}
-
 aspect production parallelForIterStmt
 top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
-  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
-  propagate reorderErrors, unrollErrors, parallelizeErrors, vectorizeErrors;
-  
   top.isParallel <- true;
   body.inParallel = true;
 }
@@ -312,19 +264,9 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
 aspect production vectorForIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
-  propagate splitTrans, reorderTrans, unrollTrans, parallelizeTrans, vectorizeTrans;
-  propagate reorderErrors, unrollErrors, parallelizeErrors, vectorizeErrors;
-  
   top.isVector <- true;
   body.inParallel = true;
   body.inVector = true;
-}
-
--- insertTrans
-aspect production forIterStmt
-top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
-{
-  propagate insertTrans;
 }
 
 -- splitTrans
@@ -332,49 +274,32 @@ synthesized attribute splitIndexTrans::Expr occurs on IterVars;
 inherited attribute splitIndexTransIn::Expr occurs on IterVars;
 
 synthesized attribute outerCutoffTrans::Expr occurs on IterVars;
-
-synthesized attribute outerCutoffIsConst::Boolean occurs on IterVars;
-synthesized attribute outerCutoffConstVal::Integer occurs on IterVars;
+synthesized attribute outerCutoffConstVal::Maybe<Integer> occurs on IterVars;
 
 aspect production consIterVar
 top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr rest::IterVars
 {
   top.splitIndexTrans = rest.splitIndexTrans;
   rest.splitIndexTransIn =
-    mkAdd(
-      mulExpr(
-        top.splitIndexTransIn,
-        cutoff,
-        location=builtin),
-      declRefExpr(n, location=builtin),
-      builtin);
+    ableC_Expr { $Expr{top.splitIndexTransIn} * $Expr{cutoff} + $Name{n} };
   
   top.outerCutoffTrans = 
-    mulExpr(
-      cutoff,
-      rest.outerCutoffTrans,
-      location=builtin);
-  
-  top.outerCutoffIsConst = 
-    case cutoff.integerConstantValue of
-    | just(n) -> rest.outerCutoffIsConst
-    | nothing() -> false
-    end;
+    ableC_Expr { $Expr{cutoff} * $Expr{rest.outerCutoffTrans} };
   
   top.outerCutoffConstVal =
-    case cutoff.integerConstantValue of
-    | just(n) -> n * rest.outerCutoffConstVal
-    | nothing() -> error("cutoff is not a constant")
-    end;
+    do (bindMaybe, returnMaybe) {
+      c :: Integer <- cutoff.integerConstantValue;
+      r :: Integer <- rest.outerCutoffConstVal;
+      return c * r;
+    };
 }
 
 aspect production nilIterVar
 top::IterVars ::= 
 {
   top.splitIndexTrans = top.splitIndexTransIn;
-  top.outerCutoffTrans = mkIntConst(1, builtin);
-  top.outerCutoffIsConst = true;
-  top.outerCutoffConstVal = 1;
+  top.outerCutoffTrans = ableC_Expr { 1 };
+  top.outerCutoffConstVal = just(1);
 }
 
 aspect production forIterStmt
@@ -407,18 +332,14 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   
   local splitIterVar::IterVar = top.newIterVar;
   
-  local forIterStmtCutoff::Expr =
-    ableC_Expr {
-      // Calculate ceil(cutoff/product of split indices)
-      1 + ($Expr{cutoff} - 1) / $Expr{splitIterVars.outerCutoffTrans}
-    };
   splitIterVar.forIterStmtCutoff =
-    case cutoff.integerConstantValue of
-    | just(n) -> 
-        if splitIterVars.outerCutoffIsConst
-        then mkIntConst(1 + (n - 1) / splitIterVars.outerCutoffConstVal, builtin)
-        else forIterStmtCutoff
-    | nothing() -> forIterStmtCutoff
+    case cutoff.integerConstantValue, splitIterVars.outerCutoffConstVal of
+    | just(n), just(o) -> mkIntConst(1 + (n - 1) / o, builtin)
+    | _, _ ->
+      ableC_Expr {
+        // Calculate ceil(cutoff/product of split indices)
+        1 + ($Expr{cutoff} - 1) / $Expr{splitIterVars.outerCutoffTrans}
+      }
     end;
   splitIterVar.forIterStmtBody = splitIterVars.forIterStmtTrans;
 
@@ -427,6 +348,14 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
     then splitIterVar.forIterStmtTrans
     else forIterStmt(bty, mty, n, cutoff, body.splitTrans);
 }
+
+-- insertTrans
+strategy attribute insertTrans =
+    forIterStmt(id, id, id, id, insertTrans) <+
+    rule on IterStmt of s -> s.insertedTransFn(s) end <+
+    id -- Required to ensure that insertTrans is total, even though this attribute only occurs on IterStmt
+  occurs on IterStmt;
+propagate insertTrans on IterStmt;
 
 -- reorderTrans
 autocopy attribute reorderConstructorsIn::[Pair<String (IterStmt ::= IterStmt)>] occurs on Names;
@@ -466,6 +395,13 @@ aspect production nilName
 top::Names ::= 
 {
   top.reorderTrans = top.reorderBaseIterStmtIn;
+}
+
+aspect default production
+top::IterStmt ::= 
+{
+  top.reorderConstructors = [];
+  top.reorderBaseIterStmt = top;
 }
 
 aspect production forIterStmt

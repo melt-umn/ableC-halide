@@ -273,7 +273,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   production d::Declarator =
     declarator(
       n, mty, nilAttribute(),
-      justInitializer(exprInitializer(ableC_Expr {0})));
+      justInitializer(exprInitializer(ableC_Expr {0}, location=builtin)));
   d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
   d.typeModifierIn = bty.typeModifier;

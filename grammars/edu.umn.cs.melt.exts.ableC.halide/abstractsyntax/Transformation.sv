@@ -517,7 +517,8 @@ IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name body::IterStmt numI
                 declarator(
                   n, mty, nilAttribute(),
                   justInitializer(
-                    exprInitializer(mkIntExpr(toString(numIters - 1), builtin)))),
+                    exprInitializer(mkIntExpr(toString(numIters - 1), builtin),
+                    location=builtin))),
                 nilDeclarator())))),
         body));
 

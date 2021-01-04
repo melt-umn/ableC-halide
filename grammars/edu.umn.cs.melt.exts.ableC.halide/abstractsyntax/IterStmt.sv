@@ -2,7 +2,6 @@ grammar edu:umn:cs:melt:exts:ableC:halide:abstractsyntax;
 
 imports silver:langutil;
 imports silver:langutil:pp;
-imports core:monad;
 
 imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;

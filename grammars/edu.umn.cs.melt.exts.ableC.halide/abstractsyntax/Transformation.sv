@@ -371,12 +371,12 @@ aspect production consName
 top::Names ::= h::Name t::Names
 {
   local reorderLookupRes::Maybe<(IterStmt ::= IterStmt)> =
-    lookupBy(stringEq, h.name, top.reorderConstructorsIn);
+    lookup(h.name, top.reorderConstructorsIn);
 
   top.reorderErrors <-
     case reorderLookupRes of
       just(_) ->
-        if containsBy(stringEq, h.name, t.names)
+        if contains(h.name, t.names)
         then [err(h.location, s"Duplicate loop name ${h.name}")]
         else []
     | nothing() -> [err(h.location, s"Loop ${h.name} is not contiguous")]
@@ -406,12 +406,12 @@ aspect production forIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   top.reorderConstructors =
-    if containsBy(stringEq, n.name, top.targets.names)
+    if contains(n.name, top.targets.names)
     then pair(n.name, forIterStmt(bty, mty, n, cutoff, _)) :: body.reorderConstructors
     else [];
   
   top.reorderBaseIterStmt =
-    if containsBy(stringEq, n.name, top.targets.names)
+    if contains(n.name, top.targets.names)
     then body.reorderBaseIterStmt
     else top;
   
@@ -420,12 +420,12 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   reorderTargets.reorderBaseIterStmtIn = top.reorderBaseIterStmt;
   
   top.reorderErrors :=
-    if containsBy(stringEq, n.name, top.targets.names)
+    if contains(n.name, top.targets.names)
     then reorderTargets.reorderErrors
     else body.reorderErrors;
 
   top.reorderTrans = 
-    if containsBy(stringEq, n.name, top.targets.names)
+    if contains(n.name, top.targets.names)
     then reorderTargets.reorderTrans
     else forIterStmt(bty, mty, n, cutoff, body.reorderTrans);
 }

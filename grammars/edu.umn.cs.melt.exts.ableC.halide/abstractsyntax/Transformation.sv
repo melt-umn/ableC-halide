@@ -285,7 +285,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
     ableC_Expr { $Expr{cutoff} * $Expr{rest.outerCutoffTrans} };
   
   top.outerCutoffConstVal =
-    do (bindMaybe, returnMaybe) {
+    do {
       c :: Integer <- cutoff.integerConstantValue;
       r :: Integer <- rest.outerCutoffConstVal;
       return c * r;

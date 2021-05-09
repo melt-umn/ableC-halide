@@ -19,17 +19,13 @@ top::Stmt ::= s::Stmt t::Transformation
   
   local normalizedS::Stmt = s.normalizeLoops;
   normalizedS.env = s.env;
-  normalizedS.returnType = s.returnType;
-  normalizedS.breakValid = s.breakValid;
-  normalizedS.continueValid = s.continueValid;
+  normalizedS.controlStmtContext = s.controlStmtContext;
   
   t.iterStmtIn = stmtToIterStmt(normalizedS);
   
   local transResult::IterStmt = t.iterStmtOut;
   transResult.env = top.env;
-  transResult.returnType = top.returnType;
-  transResult.breakValid = top.breakValid;
-  transResult.continueValid = top.continueValid;
+  transResult.controlStmtContext = top.controlStmtContext;
   
   forwards to
     if !null(s.errors)
@@ -157,7 +153,7 @@ partial strategy attribute transLoop =
       in ableC_Stmt {
         for ($BaseTypeExpr{t} $Name{i1} = host::(0); host::$Name{i2} host::< ($Expr{limit} - $Expr{initial}) / $Expr{step}; host::$Name{i3} host::++) {
           typeof($Name{i1}) $name{newName} = host::($Expr{initial} + $Name{i1} * $Expr{step});
-          $Stmt{decorate b with { targetName = i1.name; replacement = newName; env = top.env; returnType = top.returnType; breakValid = top.breakValid; continueValid = top.continueValid; }.renamed}
+          $Stmt{decorate b with { targetName = i1.name; replacement = newName; env = top.env; controlStmtContext = top.controlStmtContext; }.renamed}
         }
       }
       end
@@ -171,7 +167,7 @@ partial strategy attribute transLoop =
       in ableC_Stmt {
         for ($BaseTypeExpr{t} $Name{i1} = host::(0); host::$Name{i2} host::< ($Expr{initial} - $Expr{limit} + 1) / $Expr{step}; host::$Name{i3} host::++) {
           typeof($Name{i1}) $name{newName} = host::($Expr{initial} - $Name{i1} * $Expr{step});
-          $Stmt{decorate b with { targetName = i1.name; replacement = newName; env = top.env; returnType = top.returnType; breakValid = top.breakValid; continueValid = top.continueValid; }.renamed}
+          $Stmt{decorate b with { targetName = i1.name; replacement = newName; env = top.env; controlStmtContext = top.controlStmtContext; }.renamed}
         }
       }
       end
@@ -217,7 +213,7 @@ top::Stmt ::= ivs::IterVars body::Stmt
 monoid attribute iterDefs::[Def] with [], ++;
 synthesized attribute hostTrans::Stmt;
 
-nonterminal IterStmt with pp, errors, defs, iterDefs, hostTrans, env, returnType, breakValid, continueValid;
+nonterminal IterStmt with pp, errors, defs, iterDefs, hostTrans, env, controlStmtContext;
 
 propagate iterDefs on IterStmt;
 
@@ -284,9 +280,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   d.isTypedef = false;
   d.givenStorageClasses = nilStorageClass();
   d.givenAttributes = nilAttribute();
-  d.returnType = top.returnType;
-  d.breakValid = top.breakValid;
-  d.continueValid = top.continueValid;
+  d.controlStmtContext = top.controlStmtContext;
   
   top.defs := [];
   top.iterDefs <- [valueDef(n.name, declaratorValueItem(d))];
@@ -324,9 +318,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   d.isTypedef = false;
   d.givenStorageClasses = nilStorageClass();
   d.givenAttributes = nilAttribute();
-  d.returnType = top.returnType;
-  d.breakValid = top.breakValid;
-  d.continueValid = top.continueValid;
+  d.controlStmtContext = top.controlStmtContext;
   
   top.defs := [];
   
@@ -369,9 +361,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   d.isTypedef = false;
   d.givenStorageClasses = nilStorageClass();
   d.givenAttributes = nilAttribute();
-  d.returnType = top.returnType;
-  d.breakValid = top.breakValid;
-  d.continueValid = top.continueValid;
+  d.controlStmtContext = top.controlStmtContext;
   
   top.defs := [];
   
@@ -401,8 +391,8 @@ synthesized attribute iterVarNames::[Name];
 synthesized attribute forIterStmtTrans::IterStmt;
 inherited attribute forIterStmtBody::IterStmt;
 
-nonterminal IterVars with pp, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, env, returnType,
-  breakValid, continueValid;
+nonterminal IterVars with pp, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, env,
+  controlStmtContext;
 
 propagate errors on IterVars;
 
@@ -451,7 +441,7 @@ synthesized attribute iterVarName::Name;
 inherited attribute forIterStmtCutoff::Expr;
 
 nonterminal IterVar with pp, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff,
-  forIterStmtBody, env, returnType, breakValid, continueValid;
+  forIterStmtBody, env, controlStmtContext;
 
 propagate errors on IterVar;
 

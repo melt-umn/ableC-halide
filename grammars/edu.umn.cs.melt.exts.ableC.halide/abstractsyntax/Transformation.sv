@@ -4,7 +4,7 @@ inherited attribute iterStmtIn::IterStmt;
 synthesized attribute iterStmtOut::IterStmt;
 
 nonterminal Transformation with location, pp, errors, iterStmtIn, iterStmtOut, env, 
-  returnType, breakValid, continueValid;
+  controlStmtContext;
 
 abstract production nullTransformation
 top::Transformation ::= 
@@ -43,9 +43,7 @@ top::Transformation ::= n::Name iv::IterVar ivs::IterVars
   iterStmt.newIterVar = iv;
   iterStmt.newIterVars = ivs;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
-  iterStmt.breakValid = top.breakValid;
-  iterStmt.continueValid = top.continueValid;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   top.iterStmtOut = iterStmt.splitTrans;
 }
@@ -57,9 +55,7 @@ top::Transformation ::= n::Name ivs::IterVars
 
   local iterStmt::IterStmt = top.iterStmtIn;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
-  iterStmt.breakValid = top.breakValid;
-  iterStmt.continueValid = top.continueValid;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   n.env = addEnv(iterStmt.iterDefs, emptyEnv());
   
@@ -90,9 +86,7 @@ top::Transformation ::= ns::Names
   local iterStmt::IterStmt = top.iterStmtIn;
   iterStmt.targets = ns;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
-  iterStmt.breakValid = top.breakValid;
-  iterStmt.continueValid = top.continueValid;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   top.iterStmtOut = iterStmt.reorderTrans;
 }
@@ -125,9 +119,7 @@ top::Transformation ::= ns::Names sizes::[Integer]
   local iterStmt::IterStmt = top.iterStmtIn;
   iterStmt.targets = ns;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
-  iterStmt.breakValid = top.breakValid;
-  iterStmt.continueValid = top.continueValid;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   forwards to
     seqTransformation(
@@ -153,9 +145,7 @@ top::Transformation ::= n::Name
   local iterStmt::IterStmt = top.iterStmtIn;
   iterStmt.target = n;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
-  iterStmt.breakValid = top.breakValid;
-  iterStmt.continueValid = top.continueValid;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   top.iterStmtOut = iterStmt.unrollTrans;
 }
@@ -185,9 +175,7 @@ top::Transformation ::= n::Name numThreads::Maybe<Integer>
   iterStmt.inVector = false;
   iterStmt.numThreads = numThreads;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
-  iterStmt.breakValid = top.breakValid;
-  iterStmt.continueValid = top.continueValid;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   top.iterStmtOut = iterStmt.parallelizeTrans;
 }
@@ -211,9 +199,7 @@ top::Transformation ::= n::Name
   iterStmt.inParallel = false;
   iterStmt.inVector = false;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
-  iterStmt.breakValid = top.breakValid;
-  iterStmt.continueValid = top.continueValid;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   top.iterStmtOut = iterStmt.vectorizeTrans;
 }
@@ -335,17 +321,13 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
             innerBody,
             nullIterStmt())));
   splitTransBody.env = top.env;
-  splitTransBody.returnType = top.returnType;
-  splitTransBody.breakValid = top.breakValid;
-  splitTransBody.continueValid = top.continueValid;
+  splitTransBody.controlStmtContext = top.controlStmtContext;
   
   local splitIterVars::IterVars = top.newIterVars;
   splitIterVars.splitIndexTransIn = declRefExpr(splitIterVar.iterVarName, location=builtin);
   splitIterVars.forIterStmtBody = splitTransBody.insertTrans;
   splitIterVars.env = top.env;
-  splitIterVars.returnType = top.returnType;
-  splitIterVars.breakValid = top.breakValid;
-  splitIterVars.continueValid = top.continueValid;
+  splitIterVars.controlStmtContext = top.controlStmtContext;
   
   local splitIterVar::IterVar = top.newIterVar;
   

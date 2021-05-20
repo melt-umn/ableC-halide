@@ -16,6 +16,7 @@ top::Stmt ::= s::Stmt t::Transformation
   top.pp =
     ppConcat([pp"transform ", braces(nestlines(2, s.pp)), pp" by ", braces(nestlines(2, t.pp))]);
   top.functionDefs := [];
+  top.labelDefs := [];
   
   local normalizedS::Stmt = s.normalizeLoops;
   normalizedS.env = s.env;
@@ -205,6 +206,7 @@ top::Stmt ::= ivs::IterVars body::Stmt
 {
   top.pp = pp"forall (${ivs.pp}) ${braces(nestlines(2, body.pp))}";
   top.functionDefs := [];
+  top.labelDefs := [];
   
   ivs.forIterStmtBody = stmtIterStmt(body);
   forwards to ivs.forIterStmtTrans.hostTrans;

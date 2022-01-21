@@ -150,7 +150,7 @@ partial strategy attribute transLoop =
       for ($BaseTypeExpr{t} $Name{i1} = host::($Expr{initial}); host::$Name{i2} host::< $Expr{limit}; host::$Name{i3} host::+= $Expr{step})
         $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name && initial.isSimple && step.isSimple ->
-      let newName::String = s"_iter_${i1.name}_${toString(genIntT())}"
+      let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
       in ableC_Stmt {
         for ($BaseTypeExpr{t} $Name{i1} = host::(0); host::$Name{i2} host::< ($Expr{limit} - $Expr{initial}) / $Expr{step}; host::$Name{i3} host::++) {
           typeof($Name{i1}) $name{newName} = host::($Expr{initial} + $Name{i1} * $Expr{step});
@@ -164,7 +164,7 @@ partial strategy attribute transLoop =
       for ($BaseTypeExpr{t} $Name{i1} = host::($Expr{initial}); host::$Name{i2} host::>= $Expr{limit}; host::$Name{i3} host::-= $Expr{step})
         $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name && initial.isSimple && step.isSimple ->
-      let newName::String = s"_iter_${i1.name}_${toString(genIntT())}"
+      let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
       in ableC_Stmt {
         for ($BaseTypeExpr{t} $Name{i1} = host::(0); host::$Name{i2} host::< ($Expr{initial} - $Expr{limit} + 1) / $Expr{step}; host::$Name{i3} host::++) {
           typeof($Name{i1}) $name{newName} = host::($Expr{initial} - $Name{i1} * $Expr{step});
@@ -426,7 +426,7 @@ top::IterVars ::= cutoff::Expr rest::IterVars
     consIterVar(
       directTypeExpr(cutoff.typerep),
       baseTypeExpr(),
-      name("_iter_var_" ++ toString(genIntT()), location=builtin),
+      name("_iter_var_" ++ toString(genInt()), location=builtin),
       cutoff, rest);
 }
 

@@ -65,7 +65,7 @@ top::Transformation ::= n::Name ivs::IterVars
       iterVar(
         directTypeExpr(n.valueItem.typerep),
         baseTypeExpr(),
-        name("_iter_var_" ++ toString(genIntT()), location=builtin)),
+        name("_iter_var_" ++ toString(genInt()), location=builtin)),
       ivs,
       location=top.location);
 }

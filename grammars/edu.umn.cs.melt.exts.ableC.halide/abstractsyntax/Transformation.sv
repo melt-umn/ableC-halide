@@ -3,7 +3,8 @@ grammar edu:umn:cs:melt:exts:ableC:halide:abstractsyntax;
 inherited attribute iterStmtIn::IterStmt;
 synthesized attribute iterStmtOut::IterStmt;
 
-nonterminal Transformation with location, pp, errors, iterStmtIn, iterStmtOut, env, returnType;
+nonterminal Transformation with location, pp, errors, iterStmtIn, iterStmtOut, env, 
+  controlStmtContext;
 
 abstract production nullTransformation
 top::Transformation ::= 
@@ -19,9 +20,7 @@ top::Transformation ::= h::Transformation t::Transformation
   top.pp = ppConcat([h.pp, line(), t.pp]);
   top.errors := if !null(h.errors) then h.errors else t.errors;
   
-  h.iterStmtIn = top.iterStmtIn;
-  t.iterStmtIn = h.iterStmtOut;
-  top.iterStmtOut = t.iterStmtOut;
+  thread iterStmtIn, iterStmtOut on top, h, t, top;
 }
 
 abstract production splitTransformation
@@ -44,7 +43,7 @@ top::Transformation ::= n::Name iv::IterVar ivs::IterVars
   iterStmt.newIterVar = iv;
   iterStmt.newIterVars = ivs;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   top.iterStmtOut = iterStmt.splitTrans;
 }
@@ -56,7 +55,7 @@ top::Transformation ::= n::Name ivs::IterVars
 
   local iterStmt::IterStmt = top.iterStmtIn;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   n.env = addEnv(iterStmt.iterDefs, emptyEnv());
   
@@ -87,7 +86,7 @@ top::Transformation ::= ns::Names
   local iterStmt::IterStmt = top.iterStmtIn;
   iterStmt.targets = ns;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   top.iterStmtOut = iterStmt.reorderTrans;
 }
@@ -120,7 +119,7 @@ top::Transformation ::= ns::Names sizes::[Integer]
   local iterStmt::IterStmt = top.iterStmtIn;
   iterStmt.targets = ns;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   forwards to
     seqTransformation(
@@ -146,7 +145,7 @@ top::Transformation ::= n::Name
   local iterStmt::IterStmt = top.iterStmtIn;
   iterStmt.target = n;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   top.iterStmtOut = iterStmt.unrollTrans;
 }
@@ -176,7 +175,7 @@ top::Transformation ::= n::Name numThreads::Maybe<Integer>
   iterStmt.inVector = false;
   iterStmt.numThreads = numThreads;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   top.iterStmtOut = iterStmt.parallelizeTrans;
 }
@@ -200,7 +199,7 @@ top::Transformation ::= n::Name
   iterStmt.inParallel = false;
   iterStmt.inVector = false;
   iterStmt.env = top.env;
-  iterStmt.returnType = top.returnType;
+  iterStmt.controlStmtContext = top.controlStmtContext;
   
   top.iterStmtOut = iterStmt.vectorizeTrans;
 }
@@ -287,7 +286,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
     ableC_Expr { $Expr{cutoff} * $Expr{rest.outerCutoffTrans} };
   
   top.outerCutoffConstVal =
-    do (bindMaybe, returnMaybe) {
+    do {
       c :: Integer <- cutoff.integerConstantValue;
       r :: Integer <- rest.outerCutoffConstVal;
       return c * r;
@@ -322,13 +321,13 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
             innerBody,
             nullIterStmt())));
   splitTransBody.env = top.env;
-  splitTransBody.returnType = top.returnType;
+  splitTransBody.controlStmtContext = top.controlStmtContext;
   
   local splitIterVars::IterVars = top.newIterVars;
   splitIterVars.splitIndexTransIn = declRefExpr(splitIterVar.iterVarName, location=builtin);
   splitIterVars.forIterStmtBody = splitTransBody.insertTrans;
   splitIterVars.env = top.env;
-  splitIterVars.returnType = top.returnType;
+  splitIterVars.controlStmtContext = top.controlStmtContext;
   
   local splitIterVar::IterVar = top.newIterVar;
   
@@ -373,12 +372,12 @@ aspect production consName
 top::Names ::= h::Name t::Names
 {
   local reorderLookupRes::Maybe<(IterStmt ::= IterStmt)> =
-    lookupBy(stringEq, h.name, top.reorderConstructorsIn);
+    lookup(h.name, top.reorderConstructorsIn);
 
   top.reorderErrors <-
     case reorderLookupRes of
       just(_) ->
-        if containsBy(stringEq, h.name, t.names)
+        if contains(h.name, t.names)
         then [err(h.location, s"Duplicate loop name ${h.name}")]
         else []
     | nothing() -> [err(h.location, s"Loop ${h.name} is not contiguous")]
@@ -408,12 +407,12 @@ aspect production forIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   top.reorderConstructors =
-    if containsBy(stringEq, n.name, top.targets.names)
+    if contains(n.name, top.targets.names)
     then pair(n.name, forIterStmt(bty, mty, n, cutoff, _)) :: body.reorderConstructors
     else [];
   
   top.reorderBaseIterStmt =
-    if containsBy(stringEq, n.name, top.targets.names)
+    if contains(n.name, top.targets.names)
     then body.reorderBaseIterStmt
     else top;
   
@@ -422,12 +421,12 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   reorderTargets.reorderBaseIterStmtIn = top.reorderBaseIterStmt;
   
   top.reorderErrors :=
-    if containsBy(stringEq, n.name, top.targets.names)
+    if contains(n.name, top.targets.names)
     then reorderTargets.reorderErrors
     else body.reorderErrors;
 
   top.reorderTrans = 
-    if containsBy(stringEq, n.name, top.targets.names)
+    if contains(n.name, top.targets.names)
     then reorderTargets.reorderTrans
     else forIterStmt(bty, mty, n, cutoff, body.reorderTrans);
 }
@@ -519,7 +518,8 @@ IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name body::IterStmt numI
                 declarator(
                   n, mty, nilAttribute(),
                   justInitializer(
-                    exprInitializer(mkIntExpr(toString(numIters - 1), builtin)))),
+                    exprInitializer(mkIntExpr(toString(numIters - 1), builtin),
+                    location=builtin))),
                 nilDeclarator())))),
         body));
 

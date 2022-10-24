@@ -2,7 +2,6 @@ grammar edu:umn:cs:melt:exts:ableC:halide:abstractsyntax;
 
 imports silver:langutil;
 imports silver:langutil:pp;
-imports core:monad;
 
 imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
@@ -17,16 +16,17 @@ top::Stmt ::= s::Stmt t::Transformation
   top.pp =
     ppConcat([pp"transform ", braces(nestlines(2, s.pp)), pp" by ", braces(nestlines(2, t.pp))]);
   top.functionDefs := [];
+  top.labelDefs := [];
   
   local normalizedS::Stmt = s.normalizeLoops;
   normalizedS.env = s.env;
-  normalizedS.returnType = s.returnType;
+  normalizedS.controlStmtContext = s.controlStmtContext;
   
   t.iterStmtIn = stmtToIterStmt(normalizedS);
   
   local transResult::IterStmt = t.iterStmtOut;
   transResult.env = top.env;
-  transResult.returnType = top.returnType;
+  transResult.controlStmtContext = top.controlStmtContext;
   
   forwards to
     if !null(s.errors)
@@ -75,18 +75,18 @@ propagate simplifyNumericExprStep, simplifyNumericExpr, simplifyLoopExprs on
 partial strategy attribute preprocessLoop =
   rule on Stmt of
   -- Normalize condition orderings
-  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} host::< host::$Name{i2}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = host::($Expr{initial}); $Expr{limit} host::< host::$Name{i2}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
-    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; host::$Name{i2} host::> $Expr{limit}; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} host::> host::$Name{i2}; $Expr{iter}) $Stmt{b} }
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = host::($Expr{initial}); host::$Name{i2} host::> $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = host::($Expr{initial}); $Expr{limit} host::> host::$Name{i2}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
-    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; host::$Name{i2} host::< $Expr{limit}; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} host::<= host::$Name{i2}; $Expr{iter}) $Stmt{b} }
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = host::($Expr{initial}); host::$Name{i2} host::< $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = host::($Expr{initial}); $Expr{limit} host::<= host::$Name{i2}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
-    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; host::$Name{i2} host::>= $Expr{limit}; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} host::>= host::$Name{i2}; $Expr{iter}) $Stmt{b} }
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = host::($Expr{initial}); host::$Name{i2} host::>= $Expr{limit}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = host::($Expr{initial}); $Expr{limit} host::>= host::$Name{i2}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
-    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; host::$Name{i2} host::<= $Expr{limit}; $Expr{iter}) $Stmt{b} }
+    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = host::($Expr{initial}); host::$Name{i2} host::<= $Expr{limit}; $Expr{iter}) $Stmt{b} }
   
   -- Normalize condition operators
   | ableC_Stmt { for ($Decl{init} host::$Name{i} host::<= $Expr{limit}; $Expr{iter}) $Stmt{b} } ->
@@ -139,36 +139,36 @@ partial strategy attribute transLoop =
   rule on Stmt of
   -- Restore increment operator on loops that are otherwise-normal
   | ableC_Stmt {
-      for ($BaseTypeExpr{t} $Name{i1} = 0; host::$Name{i2} host::< $Expr{n}; host::$Name{i3} host::+= 1) $Stmt{b}
+      for ($BaseTypeExpr{t} $Name{i1} = host::(0); host::$Name{i2} host::< $Expr{n}; host::$Name{i3} host::+= 1) $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name ->
     ableC_Stmt {
-      for ($BaseTypeExpr{t} $Name{i1} = 0; host::$Name{i2} host::< $Expr{n}; host::$Name{i3} host::++) $Stmt{b}
+      for ($BaseTypeExpr{t} $Name{i1} = host::(0); host::$Name{i2} host::< $Expr{n}; host::$Name{i3} host::++) $Stmt{b}
     }
   
   -- Normalize loops with nonstandard initial or step values
   | ableC_Stmt {
-      for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; host::$Name{i2} host::< $Expr{limit}; host::$Name{i3} host::+= $Expr{step})
+      for ($BaseTypeExpr{t} $Name{i1} = host::($Expr{initial}); host::$Name{i2} host::< $Expr{limit}; host::$Name{i3} host::+= $Expr{step})
         $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name && initial.isSimple && step.isSimple ->
       let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
       in ableC_Stmt {
-        for ($BaseTypeExpr{t} $Name{i1} = 0; host::$Name{i2} host::< ($Expr{limit} - $Expr{initial}) / $Expr{step}; host::$Name{i3} host::++) {
-          typeof($Name{i1}) $name{newName} = $Expr{initial} + $Name{i1} * $Expr{step};
-          $Stmt{decorate b with { targetName = i1.name; replacement = newName; env = top.env; returnType = top.returnType; }.renamed}
+        for ($BaseTypeExpr{t} $Name{i1} = host::(0); host::$Name{i2} host::< ($Expr{limit} - $Expr{initial}) / $Expr{step}; host::$Name{i3} host::++) {
+          typeof($Name{i1}) $name{newName} = host::($Expr{initial} + $Name{i1} * $Expr{step});
+          $Stmt{decorate b with { targetName = i1.name; replacement = newName; env = top.env; controlStmtContext = top.controlStmtContext; }.renamed}
         }
       }
       end
   
   -- Normalize "backwards" loops, possibly with with nonstandard initial or step values
   | ableC_Stmt {
-      for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; host::$Name{i2} host::>= $Expr{limit}; host::$Name{i3} host::-= $Expr{step})
+      for ($BaseTypeExpr{t} $Name{i1} = host::($Expr{initial}); host::$Name{i2} host::>= $Expr{limit}; host::$Name{i3} host::-= $Expr{step})
         $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name && initial.isSimple && step.isSimple ->
       let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
       in ableC_Stmt {
-        for ($BaseTypeExpr{t} $Name{i1} = 0; host::$Name{i2} host::< ($Expr{initial} - $Expr{limit} + 1) / $Expr{step}; host::$Name{i3} host::++) {
-          typeof($Name{i1}) $name{newName} = $Expr{initial} - $Name{i1} * $Expr{step};
-          $Stmt{decorate b with { targetName = i1.name; replacement = newName; env = top.env; returnType = top.returnType; }.renamed}
+        for ($BaseTypeExpr{t} $Name{i1} = host::(0); host::$Name{i2} host::< ($Expr{initial} - $Expr{limit} + 1) / $Expr{step}; host::$Name{i3} host::++) {
+          typeof($Name{i1}) $name{newName} = host::($Expr{initial} - $Name{i1} * $Expr{step});
+          $Stmt{decorate b with { targetName = i1.name; replacement = newName; env = top.env; controlStmtContext = top.controlStmtContext; }.renamed}
         }
       }
       end
@@ -193,7 +193,7 @@ IterStmt ::= s::Decorated Stmt
     | ableC_Stmt { if ($Expr{c}) $Stmt{t} else $Stmt{e} } ->
       condIterStmt(c, stmtToIterStmt(t), stmtToIterStmt(e))
     | ableC_Stmt {
-        for ($BaseTypeExpr{t} $Name{i1} = 0; host::$Name{i2} host::< $Expr{n}; host::$Name{i3} host::++)
+        for ($BaseTypeExpr{t} $Name{i1} = host::(0); host::$Name{i2} host::< $Expr{n}; host::$Name{i3} host::++)
           $Stmt{b}
       } when i1.name == i2.name && i1.name == i3.name ->
       forIterStmt(t, baseTypeExpr(), i1, n, stmtToIterStmt(b))
@@ -206,6 +206,7 @@ top::Stmt ::= ivs::IterVars body::Stmt
 {
   top.pp = pp"forall (${ivs.pp}) ${braces(nestlines(2, body.pp))}";
   top.functionDefs := [];
+  top.labelDefs := [];
   
   ivs.forIterStmtBody = stmtIterStmt(body);
   forwards to ivs.forIterStmtTrans.hostTrans;
@@ -214,7 +215,7 @@ top::Stmt ::= ivs::IterVars body::Stmt
 monoid attribute iterDefs::[Def] with [], ++;
 synthesized attribute hostTrans::Stmt;
 
-nonterminal IterStmt with pp, errors, defs, iterDefs, hostTrans, env, returnType;
+nonterminal IterStmt with pp, errors, defs, iterDefs, hostTrans, env, controlStmtContext;
 
 propagate iterDefs on IterStmt;
 
@@ -273,7 +274,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   production d::Declarator =
     declarator(
       n, mty, nilAttribute(),
-      justInitializer(exprInitializer(ableC_Expr {0})));
+      justInitializer(exprInitializer(ableC_Expr {0}, location=builtin)));
   d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
   d.typeModifierIn = bty.typeModifier;
@@ -281,7 +282,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   d.isTypedef = false;
   d.givenStorageClasses = nilStorageClass();
   d.givenAttributes = nilAttribute();
-  d.returnType = top.returnType;
+  d.controlStmtContext = top.controlStmtContext;
   
   top.defs := [];
   top.iterDefs <- [valueDef(n.name, declaratorValueItem(d))];
@@ -319,7 +320,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   d.isTypedef = false;
   d.givenStorageClasses = nilStorageClass();
   d.givenAttributes = nilAttribute();
-  d.returnType = top.returnType;
+  d.controlStmtContext = top.controlStmtContext;
   
   top.defs := [];
   
@@ -362,7 +363,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   d.isTypedef = false;
   d.givenStorageClasses = nilStorageClass();
   d.givenAttributes = nilAttribute();
-  d.returnType = top.returnType;
+  d.controlStmtContext = top.controlStmtContext;
   
   top.defs := [];
   
@@ -392,7 +393,8 @@ synthesized attribute iterVarNames::[Name];
 synthesized attribute forIterStmtTrans::IterStmt;
 inherited attribute forIterStmtBody::IterStmt;
 
-nonterminal IterVars with pp, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, env, returnType;
+nonterminal IterVars with pp, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, env,
+  controlStmtContext;
 
 propagate errors on IterVars;
 
@@ -440,7 +442,8 @@ synthesized attribute iterVarName::Name;
 
 inherited attribute forIterStmtCutoff::Expr;
 
-nonterminal IterVar with pp, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff, forIterStmtBody, env, returnType;
+nonterminal IterVar with pp, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff,
+  forIterStmtBody, env, controlStmtContext;
 
 propagate errors on IterVar;
 

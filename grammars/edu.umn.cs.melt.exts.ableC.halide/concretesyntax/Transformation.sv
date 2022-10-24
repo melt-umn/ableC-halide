@@ -32,7 +32,7 @@ concrete productions top::Transformation_c
 | 'parallelize' id::Identifier_t ';'
   { top.ast = parallelizeTransformation(fromId(id), nothing(), location=top.location); }
 | 'parallelize' id::Identifier_t 'into' '(' n::DecConstant_t ')' 'threads' ';'
-  { top.ast = parallelizeTransformation(fromId(id), just(toInt(n.lexeme)), location=top.location); }
+  { top.ast = parallelizeTransformation(fromId(id), just(toInteger(n.lexeme)), location=top.location); }
 | 'vectorize' id::Identifier_t ';'
   { top.ast = vectorizeTransformation(fromId(id), location=top.location); }
 
@@ -50,8 +50,8 @@ closed nonterminal IntConstants_c with ast<[Integer]>;
 
 concrete productions top::IntConstants_c
 | h::DecConstant_t ',' t::IntConstants_c
-  { top.ast = toInt(h.lexeme) :: t.ast; }
+  { top.ast = toInteger(h.lexeme) :: t.ast; }
 | h::DecConstant_t
-  { top.ast = [toInt(h.lexeme)]; }
+  { top.ast = [toInteger(h.lexeme)]; }
 | 
   { top.ast = []; }

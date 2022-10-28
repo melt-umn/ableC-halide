@@ -222,15 +222,15 @@ top::Names ::=
 }
 
 -- Parameter attributes for various transformations
-autocopy attribute target::Name occurs on IterStmt;
-autocopy attribute targets::Names occurs on IterStmt;
-autocopy attribute newIterVar::IterVar occurs on IterStmt;
-autocopy attribute newIterVars::IterVars occurs on IterStmt;
+inherited attribute target::Name occurs on IterStmt;
+inherited attribute targets::Names occurs on IterStmt;
+inherited attribute newIterVar::IterVar occurs on IterStmt;
+inherited attribute newIterVars::IterVars occurs on IterStmt;
 
-autocopy attribute insertedTransFn::(IterStmt ::= IterStmt) occurs on IterStmt;
-autocopy attribute inParallel::Boolean occurs on IterStmt;
-autocopy attribute numThreads::Maybe<Integer> occurs on IterStmt;
-autocopy attribute inVector::Boolean occurs on IterStmt;
+inherited attribute insertedTransFn::(IterStmt ::= IterStmt) occurs on IterStmt;
+inherited attribute inParallel::Boolean occurs on IterStmt;
+inherited attribute numThreads::Maybe<Integer> occurs on IterStmt;
+inherited attribute inVector::Boolean occurs on IterStmt;
 
 -- Functor attributes that perform various transformations
 functor attribute splitTrans occurs on IterStmt;
@@ -357,8 +357,8 @@ strategy attribute insertTrans =
 propagate insertTrans on IterStmt;
 
 -- reorderTrans
-autocopy attribute reorderConstructorsIn::[Pair<String (IterStmt ::= IterStmt)>] occurs on Names;
-autocopy attribute reorderBaseIterStmtIn::IterStmt occurs on Names;
+inherited attribute reorderConstructorsIn::[Pair<String (IterStmt ::= IterStmt)>] occurs on Names;
+inherited attribute reorderBaseIterStmtIn::IterStmt occurs on Names;
 
 synthesized attribute reorderConstructors::[Pair<String (IterStmt ::= IterStmt)>] occurs on IterStmt;
 synthesized attribute reorderBaseIterStmt::IterStmt occurs on IterStmt;
@@ -432,8 +432,8 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
 }
 
 -- tileTrans
-autocopy attribute tileSize::[Integer] occurs on Names;
-autocopy attribute tileInnerNamesIn::Names occurs on Names;
+inherited attribute tileSize::[Integer] occurs on Names;
+inherited attribute tileInnerNamesIn::Names occurs on Names;
 
 synthesized attribute tileInnerNames::Names occurs on Names;
 synthesized attribute tileNames::Names occurs on Names;

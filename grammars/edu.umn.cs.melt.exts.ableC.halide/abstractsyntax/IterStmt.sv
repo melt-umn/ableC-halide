@@ -104,8 +104,8 @@ partial strategy attribute preprocessLoop =
 -- Transformation to perform a renaming over anything
 -- Not capture-avoiding, but that's OK!
 -- If we rename a shadowed name, then we will also rename the shadowing declaration.
-autocopy attribute targetName::String;
-autocopy attribute replacement::String;
+inherited attribute targetName::String;
+inherited attribute replacement::String;
 strategy attribute renamed =
   allTopDown(
     rule on top::Name of

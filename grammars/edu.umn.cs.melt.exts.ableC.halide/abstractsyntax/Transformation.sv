@@ -414,7 +414,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
 {
   top.reorderConstructors =
     if contains(n.name, top.targets.names)
-    then pair(n.name, forIterStmt(bty, mty, n, cutoff, _)) :: body.reorderConstructors
+    then (n.name, forIterStmt(bty, mty, n, cutoff, _)) :: body.reorderConstructors
     else [];
   
   top.reorderBaseIterStmt =

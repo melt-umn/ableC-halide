@@ -49,19 +49,19 @@ partial strategy attribute simplifyNumericExprStep =
   -- Simplify expressions as much as possible
   | ableC_Expr { ($Expr{e}) } -> e
   | ableC_Expr { host::-$Expr{e} } when e.integerConstantValue.isJust ->
-    mkIntConst(-e.integerConstantValue.fromJust, builtin)
+    mkIntConst(-e.integerConstantValue.fromJust)
   | ableC_Expr { $Expr{e1} host::+ $Expr{e2} }
     when e1.integerConstantValue.isJust && e2.integerConstantValue.isJust ->
-    mkIntConst(e1.integerConstantValue.fromJust + e2.integerConstantValue.fromJust, builtin)
+    mkIntConst(e1.integerConstantValue.fromJust + e2.integerConstantValue.fromJust)
   | ableC_Expr { $Expr{e1} host::- $Expr{e2} }
     when e1.integerConstantValue.isJust && e2.integerConstantValue.isJust ->
-    mkIntConst(e1.integerConstantValue.fromJust - e2.integerConstantValue.fromJust, builtin)
+    mkIntConst(e1.integerConstantValue.fromJust - e2.integerConstantValue.fromJust)
   | ableC_Expr { $Expr{e1} host::* $Expr{e2} }
     when e1.integerConstantValue.isJust && e2.integerConstantValue.isJust ->
-    mkIntConst(e1.integerConstantValue.fromJust * e2.integerConstantValue.fromJust, builtin)
+    mkIntConst(e1.integerConstantValue.fromJust * e2.integerConstantValue.fromJust)
   | ableC_Expr { $Expr{e1} host::/ $Expr{e2} }
     when e1.integerConstantValue.isJust && e2.integerConstantValue.isJust && e1.integerConstantValue.fromJust != 0 ->
-    mkIntConst(e1.integerConstantValue.fromJust / e2.integerConstantValue.fromJust, builtin)
+    mkIntConst(e1.integerConstantValue.fromJust / e2.integerConstantValue.fromJust)
   end;
 
 strategy attribute simplifyNumericExpr = innermost(simplifyNumericExprStep);
@@ -110,7 +110,7 @@ inherited attribute replacement::String;
 strategy attribute renamed =
   allTopDown(
     rule on top::Name of
-    | name(n) when n == top.targetName -> name(top.replacement, location=top.location)
+    | name(n) when n == top.targetName -> name(top.replacement)
     end);
 
 attribute targetName, replacement, renamed occurs on
@@ -281,7 +281,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   production d::Declarator =
     declarator(
       n, mty, nilAttribute(),
-      justInitializer(exprInitializer(ableC_Expr {0}, location=builtin)));
+      justInitializer(exprInitializer(ableC_Expr {0})));
   d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
   d.typeModifierIn = bty.typeModifier;
@@ -419,7 +419,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
   top.pp = ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp, text(" : "), cutoff.pp, comma(), space(), rest.pp]);
   top.errors <-
     case cutoff.integerConstantValue of
-    | just(n) when n < 1 -> [err(cutoff.location, "Split loop size must be >= 1")]
+    | just(n) when n < 1 -> [errFromOrigin(cutoff, "Split loop size must be >= 1")]
     | _ -> []
     end;
   top.iterVarNames = n :: rest.iterVarNames;
@@ -442,7 +442,7 @@ top::IterVars ::= cutoff::Expr rest::IterVars
     consIterVar(
       directTypeExpr(cutoff.typerep),
       baseTypeExpr(),
-      name("_iter_var_" ++ toString(genInt()), location=builtin),
+      name("_iter_var_" ++ toString(genInt())),
       cutoff, rest);
 }
 

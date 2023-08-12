@@ -271,6 +271,7 @@ abstract production forIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   top.pp = pp"for (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
+  attachNote extensionGenerated("ableC-halide");
   top.errors := bty.errors ++ d.errors ++ cutoff.errors ++ body.errors;
   top.errors <- n.valueRedeclarationCheckNoCompatible;
 
@@ -316,6 +317,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
     | nothing() -> notext()
     end;
   top.pp = pp"for parallel${numThreadsPP} (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
+  attachNote extensionGenerated("ableC-halide");
 
   bty.env = top.env;
   n.env = top.env;
@@ -363,6 +365,7 @@ abstract production vectorForIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   top.pp = pp"for vector (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
+  attachNote extensionGenerated("ableC-halide");
 
   bty.env = top.env;
   n.env = top.env;

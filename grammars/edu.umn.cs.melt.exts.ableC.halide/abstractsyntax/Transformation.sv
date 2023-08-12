@@ -282,6 +282,8 @@ synthesized attribute outerCutoffConstVal::Maybe<Integer> occurs on IterVars;
 aspect production consIterVar
 top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr rest::IterVars
 {
+  attachNote extensionGenerated("ableC-halide");
+
   top.splitIndexTrans = rest.splitIndexTrans;
   rest.splitIndexTransIn =
     ableC_Expr { $Expr{top.splitIndexTransIn} * $Expr{cutoff} + $Name{n} };
@@ -300,6 +302,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
 aspect production nilIterVar
 top::IterVars ::= 
 {
+  attachNote extensionGenerated("ableC-halide");
   top.splitIndexTrans = top.splitIndexTransIn;
   top.outerCutoffTrans = ableC_Expr { 1 };
   top.outerCutoffConstVal = just(1);
@@ -308,6 +311,8 @@ top::IterVars ::=
 aspect production forIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
+  attachNote extensionGenerated("ableC-halide");
+
   local splitTransBody::IterStmt = body;
   splitTransBody.insertedTransFn =
     \ innerBody::IterStmt ->
@@ -374,6 +379,8 @@ propagate reorderConstructorsIn, reorderBaseIterStmtIn, reorderErrors on Names;
 aspect production consName
 top::Names ::= h::Name t::Names
 {
+  attachNote extensionGenerated("ableC-halide");
+
   local reorderLookupRes::Maybe<(IterStmt ::= IterStmt)> =
     lookup(h.name, top.reorderConstructorsIn);
 

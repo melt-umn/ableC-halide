@@ -8,8 +8,6 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
 imports edu:umn:cs:melt:ableC:abstractsyntax:overloadable;
 imports edu:umn:cs:melt:ableC:abstractsyntax:env;
 
-global builtin::Location = builtinLoc("halide");
-
 abstract production transformStmt
 top::Stmt ::= s::Stmt t::Transformation
 {

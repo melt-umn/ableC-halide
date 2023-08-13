@@ -3,7 +3,7 @@ grammar edu:umn:cs:melt:exts:ableC:halide:abstractsyntax;
 inherited attribute iterStmtIn::IterStmt;
 synthesized attribute iterStmtOut::IterStmt;
 
-nonterminal Transformation with pp, errors, iterStmtIn, iterStmtOut, env, 
+tracked nonterminal Transformation with pp, errors, iterStmtIn, iterStmtOut, env, 
   controlStmtContext;
 
 propagate controlStmtContext on Transformation;

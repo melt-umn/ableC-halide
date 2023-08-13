@@ -215,7 +215,7 @@ top::Stmt ::= ivs::IterVars body::Stmt
 monoid attribute iterDefs::[Def] with [], ++;
 synthesized attribute hostTrans::Stmt;
 
-nonterminal IterStmt with pp, errors, defs, iterDefs, hostTrans, env, controlStmtContext;
+tracked nonterminal IterStmt with pp, errors, defs, iterDefs, hostTrans, env, controlStmtContext;
 
 propagate controlStmtContext, iterDefs on IterStmt;
 
@@ -409,7 +409,7 @@ synthesized attribute iterVarNames::[Name];
 synthesized attribute forIterStmtTrans::IterStmt;
 inherited attribute forIterStmtBody::IterStmt;
 
-nonterminal IterVars with pp, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, env,
+tracked nonterminal IterVars with pp, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, env,
   controlStmtContext;
 
 propagate env, controlStmtContext, errors on IterVars;
@@ -459,7 +459,7 @@ synthesized attribute iterVarName::Name;
 
 inherited attribute forIterStmtCutoff::Expr;
 
-nonterminal IterVar with pp, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff,
+tracked nonterminal IterVar with pp, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff,
   forIterStmtBody, env, controlStmtContext;
 
 propagate env, controlStmtContext, errors on IterVar;

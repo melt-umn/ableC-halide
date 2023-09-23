@@ -13,6 +13,7 @@ global builtin::Location = builtinLoc("halide");
 abstract production transformStmt
 top::Stmt ::= s::Stmt t::Transformation
 {
+  propagate env, controlStmtContext;
   top.pp =
     ppConcat([pp"transform ", braces(nestlines(2, s.pp)), pp" by ", braces(nestlines(2, t.pp))]);
   top.functionDefs := [];
@@ -104,8 +105,8 @@ partial strategy attribute preprocessLoop =
 -- Transformation to perform a renaming over anything
 -- Not capture-avoiding, but that's OK!
 -- If we rename a shadowed name, then we will also rename the shadowing declaration.
-autocopy attribute targetName::String;
-autocopy attribute replacement::String;
+inherited attribute targetName::String;
+inherited attribute replacement::String;
 strategy attribute renamed =
   allTopDown(
     rule on top::Name of
@@ -123,7 +124,7 @@ attribute targetName, replacement, renamed occurs on
   Stmt,
   MaybeInitializer, Initializer, InitList, Init, Designator,
   SpecialSpecifiers;
-propagate renamed on
+propagate targetName, replacement, renamed on
   Name, MaybeName,
   GlobalDecls, Decls, Decl, Declarators, Declarator, FunctionDecl, Parameters, ParameterDecl, StructDecl, UnionDecl, EnumDecl, StructItemList, EnumItemList, StructItem, StructDeclarators, StructDeclarator, EnumItem,
   MemberDesignator,
@@ -204,6 +205,7 @@ IterStmt ::= s::Decorated Stmt
 abstract production multiForStmt
 top::Stmt ::= ivs::IterVars body::Stmt
 {
+  propagate env, controlStmtContext;
   top.pp = pp"forall (${ivs.pp}) ${braces(nestlines(2, body.pp))}";
   top.functionDefs := [];
   top.labelDefs := [];
@@ -217,7 +219,7 @@ synthesized attribute hostTrans::Stmt;
 
 nonterminal IterStmt with pp, errors, defs, iterDefs, hostTrans, env, controlStmtContext;
 
-propagate iterDefs on IterStmt;
+propagate controlStmtContext, iterDefs on IterStmt;
 
 abstract production nullIterStmt
 top::IterStmt ::= 
@@ -234,6 +236,7 @@ top::IterStmt ::= h::IterStmt t::IterStmt
   top.pp = ppConcat([ h.pp, line(), t.pp ]);
   top.hostTrans = seqStmt(h.hostTrans, t.hostTrans);
   
+  h.env = top.env;
   t.env = addEnv(h.defs, h.env);
 }
 
@@ -251,7 +254,7 @@ top::IterStmt ::= is::IterStmt
 abstract production stmtIterStmt
 top::IterStmt ::= s::Stmt
 {
-  propagate errors, defs;
+  propagate env, errors, defs;
   top.pp = braces(braces(nestlines(2, s.pp)));
   top.hostTrans = s;
 }
@@ -259,7 +262,7 @@ top::IterStmt ::= s::Stmt
 abstract production condIterStmt
 top::IterStmt ::= cond::Expr th::IterStmt el::IterStmt
 {
-  propagate errors, defs;
+  propagate env, errors, defs;
   top.pp = pp"if (${cond.pp})${nestlines(2, th.pp)} else ${nestlines(2, el.pp)}";
   top.hostTrans = ifStmt(cond, th.hostTrans, el.hostTrans);
 }
@@ -270,6 +273,10 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   top.pp = pp"for (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
   top.errors := bty.errors ++ d.errors ++ cutoff.errors ++ body.errors;
   top.errors <- n.valueRedeclarationCheckNoCompatible;
+
+  bty.env = top.env;
+  n.env = top.env;
+  cutoff.env = top.env;
   
   production d::Declarator =
     declarator(
@@ -309,6 +316,10 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
     | nothing() -> notext()
     end;
   top.pp = pp"for parallel${numThreadsPP} (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
+
+  bty.env = top.env;
+  n.env = top.env;
+  cutoff.env = top.env;
   top.errors := bty.errors ++ d.errors ++ cutoff.errors ++ body.errors;
   top.errors <- n.valueRedeclarationCheckNoCompatible;
   
@@ -352,6 +363,10 @@ abstract production vectorForIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   top.pp = pp"for vector (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
+
+  bty.env = top.env;
+  n.env = top.env;
+  cutoff.env = top.env;
   top.errors := bty.errors ++ d.errors ++ cutoff.errors ++ body.errors;
   top.errors <- n.valueRedeclarationCheckNoCompatible;
   
@@ -396,7 +411,7 @@ inherited attribute forIterStmtBody::IterStmt;
 nonterminal IterVars with pp, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, env,
   controlStmtContext;
 
-propagate errors on IterVars;
+propagate env, controlStmtContext, errors on IterVars;
 
 abstract production consIterVar
 top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr rest::IterVars
@@ -421,6 +436,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
 abstract production consAnonIterVar
 top::IterVars ::= cutoff::Expr rest::IterVars
 {
+  propagate controlStmtContext, env;
   top.pp = ppConcat([cutoff.pp, comma(), rest.pp]);
   forwards to
     consIterVar(
@@ -445,7 +461,7 @@ inherited attribute forIterStmtCutoff::Expr;
 nonterminal IterVar with pp, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff,
   forIterStmtBody, env, controlStmtContext;
 
-propagate errors on IterVar;
+propagate env, controlStmtContext, errors on IterVar;
 
 abstract production iterVar
 top::IterVar ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name

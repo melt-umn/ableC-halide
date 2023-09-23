@@ -6,6 +6,8 @@ synthesized attribute iterStmtOut::IterStmt;
 nonterminal Transformation with location, pp, errors, iterStmtIn, iterStmtOut, env, 
   controlStmtContext;
 
+propagate controlStmtContext on Transformation;
+
 abstract production nullTransformation
 top::Transformation ::= 
 {
@@ -17,6 +19,7 @@ top::Transformation ::=
 abstract production seqTransformation
 top::Transformation ::= h::Transformation t::Transformation
 {
+  propagate env;
   top.pp = ppConcat([h.pp, line(), t.pp]);
   top.errors := if !null(h.errors) then h.errors else t.errors;
   
@@ -37,6 +40,8 @@ top::Transformation ::= n::Name iv::IterVar ivs::IterVars
     else [];
   
   n.env = addEnv(iterStmt.iterDefs, emptyEnv()); -- Env for name lookup consists of only the transformable loop variables
+  iv.env = top.env;
+  ivs.env = top.env;
  
   local iterStmt::IterStmt = top.iterStmtIn;
   iterStmt.target = n;
@@ -222,15 +227,13 @@ top::Names ::=
 }
 
 -- Parameter attributes for various transformations
-autocopy attribute target::Name occurs on IterStmt;
-autocopy attribute targets::Names occurs on IterStmt;
-autocopy attribute newIterVar::IterVar occurs on IterStmt;
-autocopy attribute newIterVars::IterVars occurs on IterStmt;
-
-autocopy attribute insertedTransFn::(IterStmt ::= IterStmt) occurs on IterStmt;
-autocopy attribute inParallel::Boolean occurs on IterStmt;
-autocopy attribute numThreads::Maybe<Integer> occurs on IterStmt;
-autocopy attribute inVector::Boolean occurs on IterStmt;
+inherited attribute target::Name occurs on IterStmt;
+inherited attribute targets::Names occurs on IterStmt;
+inherited attribute newIterVar::IterVar occurs on IterStmt;
+inherited attribute newIterVars::IterVars occurs on IterStmt;
+inherited attribute insertedTransFn::(IterStmt ::= IterStmt) occurs on IterStmt;
+inherited attribute numThreads::Maybe<Integer> occurs on IterStmt;
+propagate target, targets, newIterVar, newIterVars, insertedTransFn, numThreads on IterStmt;
 
 -- Functor attributes that perform various transformations
 functor attribute splitTrans occurs on IterStmt;
@@ -248,11 +251,13 @@ monoid attribute vectorizeErrors::[Message] with [], ++ occurs on IterStmt;
 propagate reorderErrors, unrollErrors, parallelizeErrors, vectorizeErrors on IterStmt excluding forIterStmt;
 
 -- Other misc analysis attributes used by various transformations
-monoid attribute isParallel::Boolean with false, ||;
-monoid attribute isVector::Boolean with false, ||;
-attribute isParallel, isVector occurs on IterStmt;
+monoid attribute isParallel::Boolean with false, || occurs on IterStmt;
+monoid attribute isVector::Boolean with false, || occurs on IterStmt;
+inherited attribute inParallel::Boolean occurs on IterStmt;
+inherited attribute inVector::Boolean occurs on IterStmt;
 propagate isParallel, isVector on IterStmt;
 
+propagate inParallel on IterStmt excluding parallelForIterStmt, vectorForIterStmt;
 aspect production parallelForIterStmt
 top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
@@ -260,6 +265,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
   body.inParallel = true;
 }
 
+propagate inVector on IterStmt excluding vectorForIterStmt;
 aspect production vectorForIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
@@ -357,8 +363,8 @@ strategy attribute insertTrans =
 propagate insertTrans on IterStmt;
 
 -- reorderTrans
-autocopy attribute reorderConstructorsIn::[Pair<String (IterStmt ::= IterStmt)>] occurs on Names;
-autocopy attribute reorderBaseIterStmtIn::IterStmt occurs on Names;
+inherited attribute reorderConstructorsIn::[Pair<String (IterStmt ::= IterStmt)>] occurs on Names;
+inherited attribute reorderBaseIterStmtIn::IterStmt occurs on Names;
 
 synthesized attribute reorderConstructors::[Pair<String (IterStmt ::= IterStmt)>] occurs on IterStmt;
 synthesized attribute reorderBaseIterStmt::IterStmt occurs on IterStmt;
@@ -366,7 +372,7 @@ synthesized attribute reorderBaseIterStmt::IterStmt occurs on IterStmt;
 attribute reorderErrors occurs on Names;
 attribute reorderTrans<IterStmt> occurs on Names;
 
-propagate reorderErrors on Names;
+propagate reorderConstructorsIn, reorderBaseIterStmtIn, reorderErrors on Names;
 
 aspect production consName
 top::Names ::= h::Name t::Names
@@ -432,8 +438,9 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
 }
 
 -- tileTrans
-autocopy attribute tileSize::[Integer] occurs on Names;
-autocopy attribute tileInnerNamesIn::Names occurs on Names;
+inherited attribute tileSize::[Integer] occurs on Names;
+inherited attribute tileInnerNamesIn::Names occurs on Names;
+propagate tileInnerNamesIn on Names;
 
 synthesized attribute tileInnerNames::Names occurs on Names;
 synthesized attribute tileNames::Names occurs on Names;

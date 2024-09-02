@@ -44,9 +44,9 @@ top::Transformation ::= n::Name iv::IterVar ivs::IterVars
   ivs.env = top.env;
  
   local iterStmt::IterStmt = top.iterStmtIn;
-  iterStmt.target = n;
-  iterStmt.newIterVar = iv;
-  iterStmt.newIterVars = ivs;
+  iterStmt.target = ^n;
+  iterStmt.newIterVar = ^iv;
+  iterStmt.newIterVars = ^ivs;
   iterStmt.env = top.env;
   iterStmt.controlStmtContext = top.controlStmtContext;
   
@@ -66,12 +66,12 @@ top::Transformation ::= n::Name ivs::IterVars
   
   forwards to
     splitTransformation(
-      n,
+      @n,
       iterVar(
         directTypeExpr(n.valueItem.typerep),
         baseTypeExpr(),
         name("_iter_var_" ++ toString(genInt()))),
-      ivs);
+      @ivs);
 }
 
 abstract production reorderTransformation
@@ -88,7 +88,7 @@ top::Transformation ::= ns::Names
   ns.env = addEnv(iterStmt.iterDefs, emptyEnv());
  
   local iterStmt::IterStmt = top.iterStmtIn;
-  iterStmt.targets = ns;
+  iterStmt.targets = ^ns;
   iterStmt.env = top.env;
   iterStmt.controlStmtContext = top.controlStmtContext;
   
@@ -121,7 +121,7 @@ top::Transformation ::= ns::Names sizes::[Integer]
   
   -- Decorate iterStmtIn to check loops are contiguous before splitting loops and reordering via forward
   local iterStmt::IterStmt = top.iterStmtIn;
-  iterStmt.targets = ns;
+  iterStmt.targets = ^ns;
   iterStmt.env = top.env;
   iterStmt.controlStmtContext = top.controlStmtContext;
   
@@ -146,7 +146,7 @@ top::Transformation ::= n::Name
   n.env = addEnv(iterStmt.iterDefs, emptyEnv());
   
   local iterStmt::IterStmt = top.iterStmtIn;
-  iterStmt.target = n;
+  iterStmt.target = ^n;
   iterStmt.env = top.env;
   iterStmt.controlStmtContext = top.controlStmtContext;
   
@@ -173,7 +173,7 @@ top::Transformation ::= n::Name numThreads::Maybe<Integer>
   n.env = addEnv(iterStmt.iterDefs, emptyEnv());
   
   local iterStmt::IterStmt = top.iterStmtIn;
-  iterStmt.target = n;
+  iterStmt.target = ^n;
   iterStmt.inParallel = false;
   iterStmt.inVector = false;
   iterStmt.numThreads = numThreads;
@@ -198,7 +198,7 @@ top::Transformation ::= n::Name
   n.env = addEnv(iterStmt.iterDefs, emptyEnv());
   
   local iterStmt::IterStmt = top.iterStmtIn;
-  iterStmt.target = n;
+  iterStmt.target = ^n;
   iterStmt.inParallel = false;
   iterStmt.inVector = false;
   iterStmt.env = top.env;
@@ -286,10 +286,10 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
 
   top.splitIndexTrans = rest.splitIndexTrans;
   rest.splitIndexTransIn =
-    ableC_Expr { $Expr{top.splitIndexTransIn} * $Expr{cutoff} + $Name{n} };
+    ableC_Expr { $Expr{top.splitIndexTransIn} * $Expr{^cutoff} + $Name{^n} };
   
   top.outerCutoffTrans = 
-    ableC_Expr { $Expr{cutoff} * $Expr{rest.outerCutoffTrans} };
+    ableC_Expr { $Expr{^cutoff} * $Expr{rest.outerCutoffTrans} };
   
   top.outerCutoffConstVal =
     do {
@@ -313,19 +313,19 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
 {
   attachNote extensionGenerated("ableC-halide");
 
-  local splitTransBody::IterStmt = body;
+  local splitTransBody::IterStmt = ^body;
   splitTransBody.insertedTransFn =
     \ innerBody::IterStmt ->
       compoundIterStmt(
         seqIterStmt(
           stmtIterStmt(
             ableC_Stmt {
-              $directTypeExpr{d.typerep} $Name{n} = $Expr{splitIterVars.splitIndexTrans};
+              $directTypeExpr{d.typerep} $Name{^n} = $Expr{splitIterVars.splitIndexTrans};
             }),
           condIterStmt(
             ltExpr(
-              declRefExpr(n),
-              cutoff),
+              declRefExpr(^n),
+              ^cutoff),
             innerBody,
             nullIterStmt())));
   splitTransBody.env = top.env;
@@ -345,7 +345,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
     | _, _ ->
       ableC_Expr {
         // Calculate ceil(cutoff/product of split indices)
-        1 + ($Expr{cutoff} - 1) / $Expr{splitIterVars.outerCutoffTrans}
+        1 + ($Expr{^cutoff} - 1) / $Expr{splitIterVars.outerCutoffTrans}
       }
     end;
   splitIterVar.forIterStmtBody = splitIterVars.forIterStmtTrans;
@@ -353,7 +353,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   top.splitTrans = 
     if n.name == top.target.name
     then splitIterVar.forIterStmtTrans
-    else forIterStmt(bty, mty, n, cutoff, body.splitTrans);
+    else forIterStmt(^bty, ^mty, ^n, ^cutoff, body.splitTrans);
 }
 
 -- insertTrans
@@ -410,7 +410,7 @@ aspect default production
 top::IterStmt ::= 
 {
   top.reorderConstructors = [];
-  top.reorderBaseIterStmt = top;
+  top.reorderBaseIterStmt = ^top;
 }
 
 aspect production forIterStmt
@@ -418,13 +418,13 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
 {
   top.reorderConstructors =
     if contains(n.name, top.targets.names)
-    then (n.name, forIterStmt(bty, mty, n, cutoff, _)) :: body.reorderConstructors
+    then (n.name, forIterStmt(^bty, ^mty, ^n, ^cutoff, _)) :: body.reorderConstructors
     else [];
   
   top.reorderBaseIterStmt =
     if contains(n.name, top.targets.names)
     then body.reorderBaseIterStmt
-    else top;
+    else ^top;
   
   local reorderTargets::Names = top.targets;
   reorderTargets.reorderConstructorsIn = top.reorderConstructors;
@@ -438,7 +438,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   top.reorderTrans = 
     if contains(n.name, top.targets.names)
     then reorderTargets.reorderTrans
-    else forIterStmt(bty, mty, n, cutoff, body.reorderTrans);
+    else forIterStmt(^bty, ^mty, ^n, ^cutoff, body.reorderTrans);
 }
 
 -- tileTrans
@@ -456,18 +456,18 @@ top::Names ::= h::Name t::Names
   local innerName::Name = name(h.name ++ "_inner");
   local outerName::Name = name(h.name ++ "_outer");
   
-  top.tileInnerNames = consName(innerName, t.tileInnerNames);
-  top.tileNames = consName(outerName, t.tileNames);
+  top.tileInnerNames = consName(^innerName, t.tileInnerNames);
+  top.tileNames = consName(^outerName, t.tileNames);
 
   top.tileTransformation =
     seqTransformation(
       splitTransformation(
-        h,
-        iterVar(directTypeExpr(h.valueItem.typerep), baseTypeExpr(), outerName),
+        ^h,
+        iterVar(directTypeExpr(h.valueItem.typerep), baseTypeExpr(), ^outerName),
         consIterVar(
           directTypeExpr(h.valueItem.typerep),
           baseTypeExpr(),
-          innerName,
+          ^innerName,
           mkIntConst(
             if !null(top.tileSize)
             then head(top.tileSize)
@@ -507,8 +507,8 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
 
   top.unrollTrans = 
     if n.name == top.target.name
-    then compoundIterStmt(unrollBody(bty, mty, n, body, numIters))
-    else forIterStmt(bty, mty, n, cutoff, body.unrollTrans);
+    then compoundIterStmt(unrollBody(^bty, ^mty, ^n, ^body, numIters))
+    else forIterStmt(^bty, ^mty, ^n, ^cutoff, body.unrollTrans);
 }
 
 function unrollBody
@@ -521,20 +521,20 @@ IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name body::IterStmt numI
           declStmt( 
             variableDecls(
               nilStorageClass(), nilAttribute(),
-              bty,
+              @bty,
               consDeclarator(
                 declarator(
-                  n, mty, nilAttribute(),
+                  @n, @mty, nilAttribute(),
                   justInitializer(
                     exprInitializer(mkIntExpr(toString(numIters - 1))))),
                 nilDeclarator())))),
-        body));
+        @body));
 
   return
     if numIters > 1
-    then seqIterStmt(unrollBody(bty, mty, n, body, numIters - 1), step)
+    then seqIterStmt(unrollBody(^bty, ^mty, ^n, ^body, numIters - 1), ^step)
     else if numIters == 1
-    then step
+    then ^step
     else nullIterStmt();
 }
 
@@ -554,8 +554,8 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   
   top.parallelizeTrans = 
     if n.name == top.target.name
-    then parallelForIterStmt(top.numThreads, bty, mty, n, cutoff, body.parallelizeTrans)
-    else forIterStmt(bty, mty, n, cutoff, body.parallelizeTrans);
+    then parallelForIterStmt(top.numThreads, ^bty, ^mty, ^n, ^cutoff, body.parallelizeTrans)
+    else forIterStmt(^bty, ^mty, ^n, ^cutoff, body.parallelizeTrans);
 }
 
 -- vectorizeTrans
@@ -578,6 +578,6 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   
   top.vectorizeTrans = 
     if n.name == top.target.name
-    then vectorForIterStmt(bty, mty, n, cutoff, body.vectorizeTrans)
-    else forIterStmt(bty, mty, n, cutoff, body.vectorizeTrans);
+    then vectorForIterStmt(^bty, ^mty, ^n, ^cutoff, body.vectorizeTrans)
+    else forIterStmt(^bty, ^mty, ^n, ^cutoff, body.vectorizeTrans);
 }

@@ -5,7 +5,6 @@ imports silver:langutil:pp;
 
 imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
-imports edu:umn:cs:melt:ableC:abstractsyntax:overloadable;
 imports edu:umn:cs:melt:ableC:abstractsyntax:env;
 
 abstract production transformStmt
@@ -45,7 +44,7 @@ partial strategy attribute simplifyNumericExprStep =
   end <*-}
   rule on Expr of
   -- Simplify expressions as much as possible
-  | ableC_Expr { ($Expr{e}) } -> e
+  | ableC_Expr { ($Expr{e}) } -> ^e
   | ableC_Expr { -$Expr{e} } when e.integerConstantValue.isJust ->
     mkIntConst(-e.integerConstantValue.fromJust)
   | ableC_Expr { $Expr{e1} + $Expr{e2} }
@@ -74,30 +73,34 @@ propagate simplifyNumericExprStep, simplifyNumericExpr, simplifyLoopExprs on
 partial strategy attribute preprocessLoop =
   rule on Stmt of
   -- Normalize condition orderings
-  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = ($Expr{initial}); $Expr{limit} < $Name{i2}; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} < $Expr{declRefExpr(i2)}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
-    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = ($Expr{initial}); $Name{i2} > $Expr{limit}; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = ($Expr{initial}); $Expr{limit} > $Name{i2}; $Expr{iter}) $Stmt{b} }
+    ableC_Stmt { for ($BaseTypeExpr{^t} $Name{^i1} = ($Expr{^initial}); $Name{^i2} > $Expr{^limit}; $Expr{^iter}) $Stmt{^b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} > $Expr{declRefExpr(i2)}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
-    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = ($Expr{initial}); $Name{i2} < $Expr{limit}; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = ($Expr{initial}); $Expr{limit} <= $Name{i2}; $Expr{iter}) $Stmt{b} }
+    ableC_Stmt { for ($BaseTypeExpr{^t} $Name{^i1} = ($Expr{^initial}); $Name{^i2} < $Expr{^limit}; $Expr{^iter}) $Stmt{^b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} <= $Expr{declRefExpr(i2)}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
-    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = ($Expr{initial}); $Name{i2} >= $Expr{limit}; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = ($Expr{initial}); $Expr{limit} >= $Name{i2}; $Expr{iter}) $Stmt{b} }
+    ableC_Stmt { for ($BaseTypeExpr{^t} $Name{^i1} = ($Expr{^initial}); $Name{^i2} >= $Expr{^limit}; $Expr{^iter}) $Stmt{^b} }
+  | ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{limit} >= $Expr{declRefExpr(i2)}; $Expr{iter}) $Stmt{b} }
       when i1.name == i2.name ->
-    ableC_Stmt { for ($BaseTypeExpr{t} $Name{i1} = ($Expr{initial}); $Name{i2} <= $Expr{limit}; $Expr{iter}) $Stmt{b} }
+    ableC_Stmt { for ($BaseTypeExpr{^t} $Name{^i1} = ($Expr{^initial}); $Name{^i2} <= $Expr{^limit}; $Expr{^iter}) $Stmt{^b} }
   
   -- Normalize condition operators
-  | ableC_Stmt { for ($Decl{init} $Name{i} <= $Expr{limit}; $Expr{iter}) $Stmt{b} } ->
-    ableC_Stmt { for ($Decl{init} $Name{i} < $Expr{limit} + 1; $Expr{iter}) $Stmt{b} }
-  | ableC_Stmt { for ($Decl{init} $Name{i} > $Expr{limit}; $Expr{iter}) $Stmt{b} } ->
-    ableC_Stmt { for ($Decl{init} $Name{i} >= $Expr{limit} + 1; $Expr{iter}) $Stmt{b} }
+  | ableC_Stmt { for ($Decl{init} $Expr{declRefExpr(i)} <= $Expr{limit}; $Expr{iter}) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{^init} $Name{^i} < $Expr{^limit} + 1; $Expr{^iter}) $Stmt{^b} }
+  | ableC_Stmt { for ($Decl{init} $Expr{declRefExpr(i)} > $Expr{limit}; $Expr{iter}) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{^init} $Name{^i} >= $Expr{^limit} + 1; $Expr{^iter}) $Stmt{^b} }
   
   -- Expand increment/decrement operators
-  | ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} ++) $Stmt{b} } ->
-    ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} += 1) $Stmt{b} }
-  | ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} --) $Stmt{b} } ->
-    ableC_Stmt { for ($Decl{init} $Expr{cond}; $Name{i} -= 1) $Stmt{b} }
+  | ableC_Stmt { for ($Decl{init} $Expr{cond}; $Expr{declRefExpr(i)} ++) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{^init} $Expr{^cond}; $Name{^i} += 1) $Stmt{^b} }
+  | ableC_Stmt { for ($Decl{init} $Expr{cond}; $Expr{declRefExpr(i)} --) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{^init} $Expr{^cond}; $Name{^i} -= 1) $Stmt{^b} }
+  | ableC_Stmt { for ($Decl{init} $Expr{cond}; ++ $Expr{declRefExpr(i)}) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{^init} $Expr{^cond}; $Name{^i} += 1) $Stmt{^b} }
+  | ableC_Stmt { for ($Decl{init} $Expr{cond}; -- $Expr{declRefExpr(i)}) $Stmt{b} } ->
+    ableC_Stmt { for ($Decl{^init} $Expr{^cond}; $Name{^i} -= 1) $Stmt{^b} }
   end;
 
 -- Transformation to perform a renaming over anything
@@ -138,36 +141,36 @@ partial strategy attribute transLoop =
   rule on Stmt of
   -- Restore increment operator on loops that are otherwise-normal
   | ableC_Stmt {
-      for ($BaseTypeExpr{t} $Name{i1} = (0); $Name{i2} < $Expr{n}; $Name{i3} += 1) $Stmt{b}
+      for ($BaseTypeExpr{t} $Name{i1} = 0; $Expr{declRefExpr(i2)} < $Expr{n}; $Expr{declRefExpr(i3)} += 1) $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name ->
     ableC_Stmt {
-      for ($BaseTypeExpr{t} $Name{i1} = (0); $Name{i2} < $Expr{n}; $Name{i3} ++) $Stmt{b}
+      for ($BaseTypeExpr{^t} $Name{^i1} = 0; $Name{^i2} < $Expr{^n}; $Name{^i3} ++) $Stmt{^b}
     }
   
   -- Normalize loops with nonstandard initial or step values
   | ableC_Stmt {
-      for ($BaseTypeExpr{t} $Name{i1} = ($Expr{initial}); $Name{i2} < $Expr{limit}; $Name{i3} += $Expr{step})
+      for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{declRefExpr(i2)} < $Expr{limit}; $Expr{declRefExpr(i3)} += $Expr{step})
         $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name && initial.isSimple && step.isSimple ->
       let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
       in ableC_Stmt {
-        for ($BaseTypeExpr{t} $Name{i1} = (0); $Name{i2} < ($Expr{limit} - $Expr{initial}) / $Expr{step}; $Name{i3} ++) {
-          typeof($Name{i1}) $name{newName} = ($Expr{initial} + $Name{i1} * $Expr{step});
-          $Stmt{decorate b with { targetName = i1.name; replacement = newName; env = top.env; controlStmtContext = top.controlStmtContext; }.renamed}
+        for ($BaseTypeExpr{^t} $Name{^i1} = 0; $Name{^i2} < ($Expr{^limit} - $Expr{^initial}) / $Expr{^step}; $Name{^i3} ++) {
+          typeof($Name{^i1}) $name{newName} = ($Expr{^initial} + $Name{^i1} * $Expr{^step});
+          $Stmt{decorate ^b with { targetName = i1.name; replacement = newName; env = top.env; controlStmtContext = top.controlStmtContext; }.renamed}
         }
       }
       end
   
   -- Normalize "backwards" loops, possibly with with nonstandard initial or step values
   | ableC_Stmt {
-      for ($BaseTypeExpr{t} $Name{i1} = ($Expr{initial}); $Name{i2} >= $Expr{limit}; $Name{i3} -= $Expr{step})
+      for ($BaseTypeExpr{t} $Name{i1} = $Expr{initial}; $Expr{declRefExpr(i2)} >= $Expr{limit}; $Expr{declRefExpr(i3)} -= $Expr{step})
         $Stmt{b}
     } when i1.name == i2.name && i1.name == i3.name && initial.isSimple && step.isSimple ->
       let newName::String = s"_iter_${i1.name}_${toString(genInt())}"
       in ableC_Stmt {
-        for ($BaseTypeExpr{t} $Name{i1} = (0); $Name{i2} < ($Expr{initial} - $Expr{limit} + 1) / $Expr{step}; $Name{i3} ++) {
-          typeof($Name{i1}) $name{newName} = ($Expr{initial} - $Name{i1} * $Expr{step});
-          $Stmt{decorate b with { targetName = i1.name; replacement = newName; env = top.env; controlStmtContext = top.controlStmtContext; }.renamed}
+        for ($BaseTypeExpr{^t} $Name{^i1} = 0; $Name{^i2} < ($Expr{^initial} - $Expr{^limit} + 1) / $Expr{^step}; $Name{^i3} ++) {
+          typeof($Name{^i1}) $name{newName} = ($Expr{^initial} - $Name{^i1} * $Expr{^step});
+          $Stmt{decorate ^b with { targetName = i1.name; replacement = newName; env = top.env; controlStmtContext = top.controlStmtContext; }.renamed}
         }
       }
       end
@@ -192,7 +195,7 @@ IterStmt ::= s::Decorated Stmt
     | ableC_Stmt { if ($Expr{c}) $Stmt{t} else $Stmt{e} } ->
       condIterStmt(^c, stmtToIterStmt(t), stmtToIterStmt(e))
     | ableC_Stmt {
-        for ($BaseTypeExpr{t} $Name{i1} = (0); $Name{i2} < $Expr{n}; $Name{i3} ++)
+        for ($BaseTypeExpr{t} $Name{i1} = 0; $Expr{declRefExpr(i2)} < $Expr{n}; $Expr{declRefExpr(i3)} ++)
           $Stmt{b}
       } when i1.name == i2.name && i1.name == i3.name ->
       forIterStmt(^t, baseTypeExpr(), ^i1, ^n, stmtToIterStmt(b))
@@ -423,7 +426,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
     | just(n) when n < 1 -> [errFromOrigin(cutoff, "Split loop size must be >= 1")]
     | _ -> []
     end;
-  top.iterVarNames = n :: rest.iterVarNames;
+  top.iterVarNames = ^n :: rest.iterVarNames;
   
   top.forIterStmtTrans = forIterStmt(^bty, ^mty, ^n, ^cutoff, rest.forIterStmtTrans);
   rest.forIterStmtBody = top.forIterStmtBody;

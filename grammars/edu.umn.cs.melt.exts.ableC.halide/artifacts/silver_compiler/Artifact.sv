@@ -10,7 +10,7 @@ import silver:compiler:host;
 
 parser svParse::Root {
   silver:compiler:host;
-  edu:umn:cs:melt:exts:silver:ableC;
+  edu:umn:cs:melt:ableC:silverconstruction;
   edu:umn:cs:melt:ableC:concretesyntax;
 }
 

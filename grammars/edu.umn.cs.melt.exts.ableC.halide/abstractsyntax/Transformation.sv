@@ -359,7 +359,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
 -- insertTrans
 strategy attribute insertTrans =
     forIterStmt(id, id, id, id, insertTrans) <+
-    rule on IterStmt of s -> s.insertedTransFn(s) end <+
+    rule on IterStmt of s -> s.insertedTransFn(^s) end <+
     id -- Required to ensure that insertTrans is total, even though this attribute only occurs on IterStmt
   occurs on IterStmt;
 propagate insertTrans on IterStmt;
@@ -526,7 +526,7 @@ IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name body::IterStmt numI
                 declarator(
                   @n, @mty, nilAttribute(),
                   justInitializer(
-                    exprInitializer(mkIntExpr(toString(numIters - 1))))),
+                    exprInitializer(mkIntConst(numIters - 1)))),
                 nilDeclarator())))),
         @body));
 

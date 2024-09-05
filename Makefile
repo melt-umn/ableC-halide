@@ -26,7 +26,7 @@
 
 EXT_NAME=ableC-halide
 EXT_GRAMMAR=edu:umn:cs:melt:exts:ableC:halide
-USE_SILVER_ABLEC=true
+USE_CUSTOM_SILVER=true
 
 # Path from current directory to top level ableC repository
 ABLEC_BASE?=../../ableC

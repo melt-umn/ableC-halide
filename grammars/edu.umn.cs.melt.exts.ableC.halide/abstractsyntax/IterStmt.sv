@@ -95,12 +95,12 @@ partial strategy attribute preprocessLoop =
   -- Expand increment/decrement operators
   | ableC_Stmt { for ($Decl{init} $Expr{cond}; $Expr{declRefExpr(i)} ++) $Stmt{b} } ->
     ableC_Stmt { for ($Decl{^init} $Expr{^cond}; $Name{^i} += 1) $Stmt{^b} }
-  | ableC_Stmt { for ($Decl{init} $Expr{cond}; $Expr{declRefExpr(i)} --) $Stmt{b} } ->
+  {-| ableC_Stmt { for ($Decl{init} $Expr{cond}; $Expr{declRefExpr(i)} --) $Stmt{b} } ->
     ableC_Stmt { for ($Decl{^init} $Expr{^cond}; $Name{^i} -= 1) $Stmt{^b} }
   | ableC_Stmt { for ($Decl{init} $Expr{cond}; ++ $Expr{declRefExpr(i)}) $Stmt{b} } ->
     ableC_Stmt { for ($Decl{^init} $Expr{^cond}; $Name{^i} += 1) $Stmt{^b} }
   | ableC_Stmt { for ($Decl{init} $Expr{cond}; -- $Expr{declRefExpr(i)}) $Stmt{b} } ->
-    ableC_Stmt { for ($Decl{^init} $Expr{^cond}; $Name{^i} -= 1) $Stmt{^b} }
+    ableC_Stmt { for ($Decl{^init} $Expr{^cond}; $Name{^i} -= 1) $Stmt{^b} }-}
   end;
 
 -- Transformation to perform a renaming over anything
@@ -110,9 +110,63 @@ inherited attribute targetName::String;
 inherited attribute replacement::String;
 strategy attribute renamed =
   allTopDown(
+    rule on top::Expr of
+    | defaultCallExpr(f, a) -> callExpr(f.renamed, a.renamed)
+    | defaultMemberExpr(e, d, m) -> memberExpr(e.renamed, d, m.renamed)
+    | defaultArraySubscriptExpr(e1, e2) -> arraySubscriptExpr(e1.renamed, e2.renamed)
+    | defaultPreIncExpr(e) -> preIncExpr(e.renamed)
+    | defaultPreDecExpr(e) -> preDecExpr(e.renamed)
+    | defaultPostIncExpr(e) -> postIncExpr(e.renamed)
+    | defaultPostDecExpr(e) -> postDecExpr(e.renamed)
+    | defaultAddressOfExpr(e) -> addressOfExpr(e.renamed)
+    | defaultDereferenceExpr(e) -> dereferenceExpr(e.renamed)
+    | defaultPositiveExpr(e) -> positiveExpr(e.renamed)
+    | defaultNegativeExpr(e) -> negativeExpr(e.renamed)
+    | defaultBitNegateExpr(e) -> bitNegateExpr(e.renamed)
+    | defaultNotExpr(e) -> notExpr(e.renamed)
+    | defaultEqExpr(e1, e2) -> eqExpr(e1.renamed, e2.renamed)
+    | defaultMulEqExpr(e1, e2) -> mulEqExpr(e1.renamed, e2.renamed)
+    | defaultDivEqExpr(e1, e2) -> divEqExpr(e1.renamed, e2.renamed)
+    | defaultModEqExpr(e1, e2) -> modEqExpr(e1.renamed, e2.renamed)
+    | defaultAddEqExpr(e1, e2) -> addEqExpr(e1.renamed, e2.renamed)
+    | defaultSubEqExpr(e1, e2) -> subEqExpr(e1.renamed, e2.renamed)
+    | defaultLshEqExpr(e1, e2) -> lshEqExpr(e1.renamed, e2.renamed)
+    | defaultRshEqExpr(e1, e2) -> rshEqExpr(e1.renamed, e2.renamed)
+    | defaultAndEqExpr(e1, e2) -> andEqExpr(e1.renamed, e2.renamed)
+    | defaultXorEqExpr(e1, e2) -> xorEqExpr(e1.renamed, e2.renamed)
+    | defaultOrEqExpr(e1, e2) -> orEqExpr(e1.renamed, e2.renamed)
+    | defaultAndExpr(e1, e2) -> andExpr(e1.renamed, e2.renamed)
+    | defaultOrExpr(e1, e2) -> orExpr(e1.renamed, e2.renamed)
+    | defaultAndBitExpr(e1, e2) -> andBitExpr(e1.renamed, e2.renamed)
+    | defaultOrBitExpr(e1, e2) -> orBitExpr(e1.renamed, e2.renamed)
+    | defaultXorExpr(e1, e2) -> xorExpr(e1.renamed, e2.renamed)
+    | defaultLshExpr(e1, e2) -> lshExpr(e1.renamed, e2.renamed)
+    | defaultRshExpr(e1, e2) -> rshExpr(e1.renamed, e2.renamed)
+    | defaultEqualsExpr(e1, e2) -> equalsExpr(e1.renamed, e2.renamed)
+    | defaultNotEqualsExpr(e1, e2) -> notEqualsExpr(e1.renamed, e2.renamed)
+    | defaultGtExpr(e1, e2) -> gtExpr(e1.renamed, e2.renamed)
+    | defaultLtExpr(e1, e2) -> ltExpr(e1.renamed, e2.renamed)
+    | defaultGteExpr(e1, e2) -> gteExpr(e1.renamed, e2.renamed)
+    | defaultLteExpr(e1, e2) -> lteExpr(e1.renamed, e2.renamed)
+    | defaultAddExpr(e1, e2) -> addExpr(e1.renamed, e2.renamed)
+    | defaultSubExpr(e1, e2) -> subExpr(e1.renamed, e2.renamed)
+    | defaultMulExpr(e1, e2) -> mulExpr(e1.renamed, e2.renamed)
+    | defaultDivExpr(e1, e2) -> divExpr(e1.renamed, e2.renamed)
+    | defaultModExpr(e1, e2) -> modExpr(e1.renamed, e2.renamed)
+    end <+
+    rule on top::Initializer of
+    | defaultExprInitializer(e) -> exprInitializer(e.renamed)
+    | defaultObjectInitializer(o) -> objectInitializer(o.renamed)
+    end <+
     rule on top::Name of
     | name(n) when n == top.targetName -> name(top.replacement)
     end);
+
+aspect production compoundLiteralExpr
+top::Expr ::= t::TypeName i::InitList
+{
+  i.targetName = top.targetName;
+}
 
 attribute targetName, replacement, renamed occurs on
   Name, MaybeName,
@@ -125,7 +179,7 @@ attribute targetName, replacement, renamed occurs on
   Stmt,
   MaybeInitializer, Initializer, InitList, Init, Designator,
   SpecialSpecifiers;
-propagate targetName, replacement, renamed on
+propagate @targetName, @replacement, renamed on
   Name, MaybeName,
   GlobalDecls, Decls, Decl, Declarators, Declarator, FunctionDecl, Parameters, ParameterDecl, StructDecl, UnionDecl, EnumDecl, StructItemList, EnumItemList, StructItem, StructDeclarators, StructDeclarator, EnumItem,
   MemberDesignator,

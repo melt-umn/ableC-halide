@@ -8,8 +8,6 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
 imports edu:umn:cs:melt:ableC:abstractsyntax:overloadable;
 imports edu:umn:cs:melt:ableC:abstractsyntax:env;
 
-global builtin::Location = builtinLoc("halide");
-
 abstract production transformStmt
 top::Stmt ::= s::Stmt t::Transformation
 {
@@ -49,19 +47,19 @@ partial strategy attribute simplifyNumericExprStep =
   -- Simplify expressions as much as possible
   | ableC_Expr { ($Expr{e}) } -> e
   | ableC_Expr { host::-$Expr{e} } when e.integerConstantValue.isJust ->
-    mkIntConst(-e.integerConstantValue.fromJust, builtin)
+    mkIntConst(-e.integerConstantValue.fromJust)
   | ableC_Expr { $Expr{e1} host::+ $Expr{e2} }
     when e1.integerConstantValue.isJust && e2.integerConstantValue.isJust ->
-    mkIntConst(e1.integerConstantValue.fromJust + e2.integerConstantValue.fromJust, builtin)
+    mkIntConst(e1.integerConstantValue.fromJust + e2.integerConstantValue.fromJust)
   | ableC_Expr { $Expr{e1} host::- $Expr{e2} }
     when e1.integerConstantValue.isJust && e2.integerConstantValue.isJust ->
-    mkIntConst(e1.integerConstantValue.fromJust - e2.integerConstantValue.fromJust, builtin)
+    mkIntConst(e1.integerConstantValue.fromJust - e2.integerConstantValue.fromJust)
   | ableC_Expr { $Expr{e1} host::* $Expr{e2} }
     when e1.integerConstantValue.isJust && e2.integerConstantValue.isJust ->
-    mkIntConst(e1.integerConstantValue.fromJust * e2.integerConstantValue.fromJust, builtin)
+    mkIntConst(e1.integerConstantValue.fromJust * e2.integerConstantValue.fromJust)
   | ableC_Expr { $Expr{e1} host::/ $Expr{e2} }
     when e1.integerConstantValue.isJust && e2.integerConstantValue.isJust && e1.integerConstantValue.fromJust != 0 ->
-    mkIntConst(e1.integerConstantValue.fromJust / e2.integerConstantValue.fromJust, builtin)
+    mkIntConst(e1.integerConstantValue.fromJust / e2.integerConstantValue.fromJust)
   end;
 
 strategy attribute simplifyNumericExpr = innermost(simplifyNumericExprStep);
@@ -110,7 +108,7 @@ inherited attribute replacement::String;
 strategy attribute renamed =
   allTopDown(
     rule on top::Name of
-    | name(n) when n == top.targetName -> name(top.replacement, location=top.location)
+    | name(n) when n == top.targetName -> name(top.replacement)
     end);
 
 attribute targetName, replacement, renamed occurs on
@@ -217,7 +215,7 @@ top::Stmt ::= ivs::IterVars body::Stmt
 monoid attribute iterDefs::[Def] with [], ++;
 synthesized attribute hostTrans::Stmt;
 
-nonterminal IterStmt with pp, errors, defs, iterDefs, hostTrans, env, controlStmtContext;
+tracked nonterminal IterStmt with pp, errors, defs, iterDefs, hostTrans, env, controlStmtContext;
 
 propagate controlStmtContext, iterDefs on IterStmt;
 
@@ -271,6 +269,7 @@ abstract production forIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   top.pp = pp"for (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
+  attachNote extensionGenerated("ableC-halide");
   top.errors := bty.errors ++ d.errors ++ cutoff.errors ++ body.errors;
   top.errors <- n.valueRedeclarationCheckNoCompatible;
 
@@ -281,7 +280,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   production d::Declarator =
     declarator(
       n, mty, nilAttribute(),
-      justInitializer(exprInitializer(ableC_Expr {0}, location=builtin)));
+      justInitializer(exprInitializer(ableC_Expr {0})));
   d.env = openScopeEnv(top.env);
   d.baseType = bty.typerep;
   d.typeModifierIn = bty.typeModifier;
@@ -316,6 +315,7 @@ top::IterStmt ::= numThreads::Maybe<Integer> bty::BaseTypeExpr mty::TypeModifier
     | nothing() -> notext()
     end;
   top.pp = pp"for parallel${numThreadsPP} (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
+  attachNote extensionGenerated("ableC-halide");
 
   bty.env = top.env;
   n.env = top.env;
@@ -363,6 +363,7 @@ abstract production vectorForIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
   top.pp = pp"for vector (${ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp])} : ${cutoff.pp}) ${braces(nestlines(2, body.pp))}";
+  attachNote extensionGenerated("ableC-halide");
 
   bty.env = top.env;
   n.env = top.env;
@@ -408,7 +409,7 @@ synthesized attribute iterVarNames::[Name];
 synthesized attribute forIterStmtTrans::IterStmt;
 inherited attribute forIterStmtBody::IterStmt;
 
-nonterminal IterVars with pp, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, env,
+tracked nonterminal IterVars with pp, errors, iterVarNames, forIterStmtTrans, forIterStmtBody, env,
   controlStmtContext;
 
 propagate env, controlStmtContext, errors on IterVars;
@@ -419,7 +420,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
   top.pp = ppConcat([bty.pp, space(), mty.lpp, n.pp, mty.rpp, text(" : "), cutoff.pp, comma(), space(), rest.pp]);
   top.errors <-
     case cutoff.integerConstantValue of
-    | just(n) when n < 1 -> [err(cutoff.location, "Split loop size must be >= 1")]
+    | just(n) when n < 1 -> [errFromOrigin(cutoff, "Split loop size must be >= 1")]
     | _ -> []
     end;
   top.iterVarNames = n :: rest.iterVarNames;
@@ -442,7 +443,7 @@ top::IterVars ::= cutoff::Expr rest::IterVars
     consIterVar(
       directTypeExpr(cutoff.typerep),
       baseTypeExpr(),
-      name("_iter_var_" ++ toString(genInt()), location=builtin),
+      name("_iter_var_" ++ toString(genInt())),
       cutoff, rest);
 }
 
@@ -458,7 +459,7 @@ synthesized attribute iterVarName::Name;
 
 inherited attribute forIterStmtCutoff::Expr;
 
-nonterminal IterVar with pp, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff,
+tracked nonterminal IterVar with pp, errors, iterVarName, forIterStmtTrans, forIterStmtCutoff,
   forIterStmtBody, env, controlStmtContext;
 
 propagate env, controlStmtContext, errors on IterVar;

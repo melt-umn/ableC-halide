@@ -3,7 +3,7 @@ grammar edu:umn:cs:melt:exts:ableC:halide:abstractsyntax;
 inherited attribute iterStmtIn::IterStmt;
 synthesized attribute iterStmtOut::IterStmt;
 
-nonterminal Transformation with location, pp, errors, iterStmtIn, iterStmtOut, env, 
+tracked nonterminal Transformation with pp, errors, iterStmtIn, iterStmtOut, env, 
   controlStmtContext;
 
 propagate controlStmtContext on Transformation;
@@ -36,7 +36,7 @@ top::Transformation ::= n::Name iv::IterVar ivs::IterVars
     if !null(iterStmt.errors)
     then iterStmt.errors
     else if !null(n.valueLookupCheck)
-    then [err(n.location, n.name ++ " is not a transformable loop")]
+    then [errFromOrigin(n, n.name ++ " is not a transformable loop")]
     else [];
   
   n.env = addEnv(iterStmt.iterDefs, emptyEnv()); -- Env for name lookup consists of only the transformable loop variables
@@ -70,9 +70,8 @@ top::Transformation ::= n::Name ivs::IterVars
       iterVar(
         directTypeExpr(n.valueItem.typerep),
         baseTypeExpr(),
-        name("_iter_var_" ++ toString(genInt()), location=builtin)),
-      ivs,
-      location=top.location);
+        name("_iter_var_" ++ toString(genInt()))),
+      ivs);
 }
 
 abstract production reorderTransformation
@@ -113,7 +112,7 @@ top::Transformation ::= ns::Names sizes::[Integer]
     else forward.errors;
   top.errors <- 
     if ns.count != length(sizes)
-    then [err(top.location, s"Incorrect tile dimension: Expected ${toString(ns.count)}, got ${toString(length(sizes))}")]
+    then [errFromOrigin(top, s"Incorrect tile dimension: Expected ${toString(ns.count)}, got ${toString(length(sizes))}")]
     else [];
   
   ns.tileSize = sizes;
@@ -129,8 +128,7 @@ top::Transformation ::= ns::Names sizes::[Integer]
   forwards to
     seqTransformation(
       ns.tileTransformation,
-      reorderTransformation(ns.tileNames, location=builtin),
-      location=builtin);
+      reorderTransformation(ns.tileNames));
 }
 
 abstract production unrollTransformation
@@ -141,7 +139,7 @@ top::Transformation ::= n::Name
     if !null(iterStmt.errors)
     then iterStmt.errors
     else if !null(n.valueLookupCheck)
-    then [err(n.location, n.name ++ " is not a transformable loop")]
+    then [errFromOrigin(n, n.name ++ " is not a transformable loop")]
     else [];
   top.errors <- iterStmt.unrollErrors;
   
@@ -168,7 +166,7 @@ top::Transformation ::= n::Name numThreads::Maybe<Integer>
     if !null(iterStmt.errors)
     then iterStmt.errors
     else if !null(n.valueLookupCheck)
-    then [err(n.location, n.name ++ " is not a transformable loop")]
+    then [errFromOrigin(n, n.name ++ " is not a transformable loop")]
     else [];
   top.errors <- iterStmt.parallelizeErrors;
   
@@ -193,7 +191,7 @@ top::Transformation ::= n::Name
     if !null(iterStmt.errors)
     then iterStmt.errors
     else if !null(n.valueLookupCheck)
-    then [err(n.location, n.name ++ " is not a transformable loop")]
+    then [errFromOrigin(n, n.name ++ " is not a transformable loop")]
     else [];
   top.errors <- iterStmt.vectorizeErrors;
   
@@ -216,7 +214,7 @@ top::Names ::= h::Name t::Names
 {
   top.loopLookupChecks =
     (if !null(h.valueLookupCheck)
-     then [err(h.location, h.name ++ " is not a transformable loop")]
+     then [errFromOrigin(h, h.name ++ " is not a transformable loop")]
      else []) ++ t.loopLookupChecks;
 }
 
@@ -284,6 +282,8 @@ synthesized attribute outerCutoffConstVal::Maybe<Integer> occurs on IterVars;
 aspect production consIterVar
 top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr rest::IterVars
 {
+  attachNote extensionGenerated("ableC-halide");
+
   top.splitIndexTrans = rest.splitIndexTrans;
   rest.splitIndexTransIn =
     ableC_Expr { $Expr{top.splitIndexTransIn} * $Expr{cutoff} + $Name{n} };
@@ -302,6 +302,7 @@ top::IterVars ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr r
 aspect production nilIterVar
 top::IterVars ::= 
 {
+  attachNote extensionGenerated("ableC-halide");
   top.splitIndexTrans = top.splitIndexTransIn;
   top.outerCutoffTrans = ableC_Expr { 1 };
   top.outerCutoffConstVal = just(1);
@@ -310,6 +311,8 @@ top::IterVars ::=
 aspect production forIterStmt
 top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr body::IterStmt
 {
+  attachNote extensionGenerated("ableC-halide");
+
   local splitTransBody::IterStmt = body;
   splitTransBody.insertedTransFn =
     \ innerBody::IterStmt ->
@@ -321,16 +324,15 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
             }),
           condIterStmt(
             ltExpr(
-              declRefExpr(n, location=builtin),
-              cutoff,
-              location=builtin),
+              declRefExpr(n),
+              cutoff),
             innerBody,
             nullIterStmt())));
   splitTransBody.env = top.env;
   splitTransBody.controlStmtContext = top.controlStmtContext;
   
   local splitIterVars::IterVars = top.newIterVars;
-  splitIterVars.splitIndexTransIn = declRefExpr(splitIterVar.iterVarName, location=builtin);
+  splitIterVars.splitIndexTransIn = declRefExpr(splitIterVar.iterVarName);
   splitIterVars.forIterStmtBody = splitTransBody.insertTrans;
   splitIterVars.env = top.env;
   splitIterVars.controlStmtContext = top.controlStmtContext;
@@ -339,7 +341,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   
   splitIterVar.forIterStmtCutoff =
     case cutoff.integerConstantValue, splitIterVars.outerCutoffConstVal of
-    | just(n), just(o) -> mkIntConst(1 + (n - 1) / o, builtin)
+    | just(n), just(o) -> mkIntConst(1 + (n - 1) / o)
     | _, _ ->
       ableC_Expr {
         // Calculate ceil(cutoff/product of split indices)
@@ -377,6 +379,8 @@ propagate reorderConstructorsIn, reorderBaseIterStmtIn, reorderErrors on Names;
 aspect production consName
 top::Names ::= h::Name t::Names
 {
+  attachNote extensionGenerated("ableC-halide");
+
   local reorderLookupRes::Maybe<(IterStmt ::= IterStmt)> =
     lookup(h.name, top.reorderConstructorsIn);
 
@@ -384,9 +388,9 @@ top::Names ::= h::Name t::Names
     case reorderLookupRes of
       just(_) ->
         if contains(h.name, t.names)
-        then [err(h.location, s"Duplicate loop name ${h.name}")]
+        then [errFromOrigin(h, s"Duplicate loop name ${h.name}")]
         else []
-    | nothing() -> [err(h.location, s"Loop ${h.name} is not contiguous")]
+    | nothing() -> [errFromOrigin(h, s"Loop ${h.name} is not contiguous")]
     end;
   
   top.reorderTrans = 
@@ -449,8 +453,8 @@ synthesized attribute tileTransformation::Transformation occurs on Names;
 aspect production consName
 top::Names ::= h::Name t::Names
 {
-  local innerName::Name = name(h.name ++ "_inner", location=builtin);
-  local outerName::Name = name(h.name ++ "_outer", location=builtin);
+  local innerName::Name = name(h.name ++ "_inner");
+  local outerName::Name = name(h.name ++ "_outer");
   
   top.tileInnerNames = consName(innerName, t.tileInnerNames);
   top.tileNames = consName(outerName, t.tileNames);
@@ -467,12 +471,9 @@ top::Names ::= h::Name t::Names
           mkIntConst(
             if !null(top.tileSize)
             then head(top.tileSize)
-            else error("Tile has wrong dimension"),
-            builtin),
-          nilIterVar()),
-        location=builtin),
-      t.tileTransformation,
-      location=builtin);
+            else error("Tile has wrong dimension")),
+          nilIterVar())),
+      t.tileTransformation);
   
   t.tileSize = tail(top.tileSize);
 }
@@ -482,7 +483,7 @@ top::Names ::=
 {
   top.tileInnerNames = nilName();
   top.tileNames = top.tileInnerNamesIn;
-  top.tileTransformation = nullTransformation(location=builtin);
+  top.tileTransformation = nullTransformation();
 }
 
 -- unrollTrans
@@ -500,7 +501,7 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
     then
       case cutoff.integerConstantValue of
       | just(n) -> []
-      | nothing() -> [err(top.target.location, "Unrolled loop must have constant cutoff")]
+      | nothing() -> [errFromOrigin(top.target, "Unrolled loop must have constant cutoff")]
       end
     else body.unrollErrors;
 
@@ -525,8 +526,7 @@ IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name body::IterStmt numI
                 declarator(
                   n, mty, nilAttribute(),
                   justInitializer(
-                    exprInitializer(mkIntExpr(toString(numIters - 1), builtin),
-                    location=builtin))),
+                    exprInitializer(mkIntExpr(toString(numIters - 1))))),
                 nilDeclarator())))),
         body));
 
@@ -545,11 +545,11 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   propagate parallelizeErrors;
   top.parallelizeErrors <-
     if top.inParallel
-    then [wrn(top.target.location, n.name ++ " is already within a parallel section, parallelizing will have no effect")]
+    then [wrnFromOrigin(top.target, n.name ++ " is already within a parallel section, parallelizing will have no effect")]
     else [];
   top.parallelizeErrors <-
     if body.isParallel
-    then [wrn(top.target.location, n.name ++ " contains a parallel section that will be hidden")]
+    then [wrnFromOrigin(top.target, n.name ++ " contains a parallel section that will be hidden")]
     else [];
   
   top.parallelizeTrans = 
@@ -565,15 +565,15 @@ top::IterStmt ::= bty::BaseTypeExpr mty::TypeModifierExpr n::Name cutoff::Expr b
   propagate vectorizeErrors;
   top.vectorizeErrors <-
     if top.inVector
-    then [err(top.target.location, n.name ++ " is already within a vector section and cannot be vectorized")]
+    then [errFromOrigin(top.target, n.name ++ " is already within a vector section and cannot be vectorized")]
     else [];
   top.vectorizeErrors <-
     if top.isVector
-    then [err(top.target.location, n.name ++ " contains a vector section and cannot be vectorized")]
+    then [errFromOrigin(top.target, n.name ++ " contains a vector section and cannot be vectorized")]
     else [];
   top.vectorizeErrors <-
     if body.isParallel
-    then [wrn(top.target.location, n.name ++ " contains a parallel section and cannot be vectorized")]
+    then [wrnFromOrigin(top.target, n.name ++ " contains a parallel section and cannot be vectorized")]
     else [];
   
   top.vectorizeTrans = 

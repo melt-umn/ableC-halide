@@ -162,12 +162,6 @@ strategy attribute renamed =
     | name(n) when n == top.targetName -> name(top.replacement)
     end);
 
-aspect production compoundLiteralExpr
-top::Expr ::= t::TypeName i::InitList
-{
-  i.targetName = top.targetName;
-}
-
 attribute targetName, replacement, renamed occurs on
   Name, MaybeName,
   GlobalDecls, Decls, Decl, Declarators, Declarator, FunctionDecl, Parameters, ParameterDecl, StructDecl, UnionDecl, EnumDecl, StructItemList, EnumItemList, StructItem, StructDeclarators, StructDeclarator, EnumItem,
